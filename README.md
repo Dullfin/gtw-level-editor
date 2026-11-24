@@ -16,8 +16,8 @@ Custom levels run in an empty Doinkler world, and **the game's saves are switche
 
 You need Get To Work with [BepInEx 5](https://github.com/BepInEx/BepInEx) installed.
 
-1. Build the plugin (see [Building](#building)). The build copies `GTWLevelEditor.dll` into `Get To Work\BepInEx\plugins` for you.
-2. To get the example levels, open the Level Editor menu in game, click **Import level…** and pick the files in [`Levels/`](Levels). You can also copy them into `Get To Work\BepInEx\LevelEditor\Levels\` yourself.
+1. Download `GTWLevelEditor.dll` from the [latest release](https://github.com/Dullfin/gtw-level-editor/releases/latest) and put it in `Get To Work\BepInEx\plugins`. Or build it yourself (see [Building](#building)), which copies the DLL there for you.
+2. To get the example levels, open the Level Editor menu in game, click **Import level…** and pick the files from `Example-Levels.zip` in the release, or from [`Levels/`](Levels). You can also copy them into `Get To Work\BepInEx\LevelEditor\Levels\` yourself.
 
 ## Included levels
 
