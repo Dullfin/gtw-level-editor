@@ -59,6 +59,7 @@ namespace GTWLevelEditor
                     var mc = shape.AddComponent<MeshCollider>();
                     mc.sharedMesh = shape.GetComponent<MeshFilter>().sharedMesh;
                     mc.convex = true;
+                    if (Data.Kind == ObjectKind.Cylinder) _solidCylinderMesh = mc.sharedMesh;
                     break;
                 case ObjectKind.Ramp:
                     shape = new GameObject("Ramp");
@@ -178,6 +179,7 @@ namespace GTWLevelEditor
         {
             ApplyTransform();
             if (_rampMesh != null) RefreshRamp();
+            if (Data.Kind == ObjectKind.Cylinder) RefreshHollow();
             if (_material != null) GameBridge.SetColor(_material, _isGhost ? Ghostly(Data.color) : Data.color);
             if (_solid != null)
             {
@@ -185,6 +187,7 @@ namespace GTWLevelEditor
                 ApplySurface(_solid.gameObject);
             }
             RefreshLauncherParts();
+            RefreshJumpZone();
             RefreshPendulum();
             RefreshMotionBody();
         }
@@ -246,6 +249,7 @@ namespace GTWLevelEditor
             _isGhost = ghost;
             if (_solid != null) _solid.enabled = !ghost;
             if (_trigger != null) _trigger.enabled = !ghost;
+            if (_jumpZone != null) _jumpZone.enabled = !ghost;
             foreach (var c in _extraSolids) c.enabled = !ghost;
             Refresh();
         }
@@ -302,6 +306,12 @@ namespace GTWLevelEditor
                 case ObjectKind.Checkpoint:
                     LevelEditorController.Instance.ReachCheckpoint(this);
                     break;
+                case ObjectKind.Platform:
+                case ObjectKind.Cylinder:
+                case ObjectKind.Sphere:
+                    // The launch zone above a Jump pad surface.
+                    if (Data.HasJumpZone) JumpOff(transform.up);
+                    break;
                 case ObjectKind.Finish:
                     LevelEditorController.Instance.ReachFinish();
                     break;
@@ -327,6 +337,8 @@ namespace GTWLevelEditor
             if (_material != null) Destroy(_material);
             foreach (var m in _extraMaterials) if (m.material != null) Destroy(m.material);
             if (_rampMesh != null) Destroy(_rampMesh);
+            if (_hollowMesh != null) Destroy(_hollowMesh);
+            if (_cutMesh != null) Destroy(_cutMesh);
         }
 
         /// <summary>A unit wedge: flat bottom, vertical back face at +Z, slope rising from -Z to +Z.</summary>

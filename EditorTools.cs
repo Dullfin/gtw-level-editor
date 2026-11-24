@@ -582,6 +582,7 @@ namespace GTWLevelEditor
 
             DrawLaunchPaths(cam, ui);
             DrawMotionPaths(cam, ui);
+            DrawJumpZones(cam, ui);
 
             if (!_cursorMode && _rampTool)
             {
@@ -688,6 +689,25 @@ namespace GTWLevelEditor
                 // A short line beyond the end shows the throw direction.
                 var c = ToGui(cam, o.LaunchEnd + o.LaunchDirection * Mathf.Max(2f, o.Data.force * 0.3f), out var cv);
                 if (cv) Line(b, c, new Color(1f, 1f, 1f, 0.5f), 2f * ui);
+            }
+        }
+
+        private readonly Vector3[] _zoneCorners = new Vector3[8];
+        private static readonly int[] BoxEdges = { 0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7 };
+
+        /// <summary>Outlines the launch zone above each Jump pad surface (brighter on the selection).</summary>
+        private void DrawJumpZones(Camera cam, float ui)
+        {
+            foreach (var o in _objects)
+            {
+                if (o == null || !o.JumpZoneCorners(_zoneCorners)) continue;
+                var color = o == _selected ? new Color(1f, 0.6f, 0.15f, 0.95f) : new Color(1f, 0.6f, 0.15f, 0.35f);
+                for (int e = 0; e < BoxEdges.Length; e += 2)
+                {
+                    var a = ToGui(cam, _zoneCorners[BoxEdges[e]], out var av);
+                    var b = ToGui(cam, _zoneCorners[BoxEdges[e + 1]], out var bv);
+                    if (av && bv) Line(a, b, color, 2f * ui);
+                }
             }
         }
 

@@ -14,10 +14,9 @@ namespace GTWLevelEditor
         {
             Theme.Section("Motion");
             GUILayout.BeginVertical(Theme.Card);
-            GUILayout.BeginHorizontal();
-            foreach (MotionType m in Enum.GetValues(typeof(MotionType)))
-                if (GUILayout.Toggle(d.Motion == m, m.ToString(), Theme.Segment) && d.Motion != m) SetMotion(d, m);
-            GUILayout.EndHorizontal();
+            var motions = (MotionType[])Enum.GetValues(typeof(MotionType));
+            int pick = SegmentRow(Array.IndexOf(motions, d.Motion), Array.ConvertAll(motions, m => m.ToString()));
+            if (pick >= 0 && motions[pick] != d.Motion) SetMotion(d, motions[pick]);
 
             switch (d.Motion)
             {

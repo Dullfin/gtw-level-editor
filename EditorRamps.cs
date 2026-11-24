@@ -14,6 +14,9 @@ namespace GTWLevelEditor
         private float _draftHeight, _draftWidth = 4f, _draftBank;
         private Vector3 _draftCursor, _draftGround;
         private bool _draftSnapped;
+        /// <summary>How far away (m) the next point sits, set with Ctrl + wheel. 0 = on whatever the crosshair hits.</summary>
+        private float _draftReach;
+        private const float MaxReach = 120f;
         /// <summary>Shape settings for new ramps: copied from the last ramp you edited.</summary>
         private LevelObjectData _rampTemplate = LevelObjectData.CreateDefault(ObjectKind.Ramp);
 
@@ -23,7 +26,10 @@ namespace GTWLevelEditor
         {
             // ---- the next point, under the crosshair ----
             var ray = CenterRay();
-            _draftGround = RaycastSurface(ray, 120f, out var hit) ? hit.point : ray.GetPoint(_ghostDistance);
+            // A surface closer than the chosen distance still catches the point; otherwise it floats at that distance.
+            float reach = _draftReach > 0f ? _draftReach : MaxReach;
+            bool onSurface = RaycastSurface(ray, reach, out var hit);
+            _draftGround = onSurface ? hit.point : ray.GetPoint(_draftReach > 0f ? _draftReach : _ghostDistance);
             if (_snap) _draftGround = new Vector3(Snap(_draftGround.x), _draftGround.y, Snap(_draftGround.z));
 
             _draftSnapped = false;
@@ -45,14 +51,19 @@ namespace GTWLevelEditor
             if (wheel != 0f)
             {
                 float step = Mathf.Sign(wheel) * Mathf.Max(1f, Mathf.Round(Mathf.Abs(wheel))) * 0.5f; // one 0.5 m step per wheel notch
-                if (Input.GetKey(KeyCode.LeftAlt)) _ghostDistance = Mathf.Clamp(_ghostDistance * Mathf.Pow(1.1f, wheel), 2f, 80f);
+                if (Ctrl)
+                {
+                    // Start from where the point is now, so the first notch pulls it in from the surface.
+                    if (_draftReach <= 0f) _draftReach = onSurface ? hit.distance : _ghostDistance;
+                    _draftReach = Mathf.Clamp(_draftReach * Mathf.Pow(1.1f, wheel), 2f, MaxReach);
+                }
                 else if (fast) _draftWidth = Mathf.Clamp(_draftWidth + step, 0.5f, 60f);
                 else _draftHeight = Mathf.Clamp(_draftHeight + step, -50f, 100f);
             }
             float bankStep = fast ? 15f : 5f;
             if (Input.GetKeyDown(KeyCode.Q)) _draftBank = Mathf.Clamp(_draftBank - bankStep, -90f, 90f);
             if (Input.GetKeyDown(KeyCode.E)) _draftBank = Mathf.Clamp(_draftBank + bankStep, -90f, 90f);
-            if (Input.GetKeyDown(KeyCode.T)) { _draftHeight = 0f; _draftBank = 0f; }
+            if (Input.GetKeyDown(KeyCode.T)) { _draftHeight = 0f; _draftBank = 0f; _draftReach = 0f; }
 
             // ---- add / remove / finish ----
             if (Input.GetMouseButtonDown(0))
@@ -168,14 +179,9 @@ namespace GTWLevelEditor
         {
             var d = obj.Data;
             GUILayout.Label("Shape across the track", Theme.Hint);
-            GUILayout.BeginHorizontal();
-            foreach (var prof in new[] { RampProfile.Flat, RampProfile.Gutter, RampProfile.HalfPipe })
-                if (GUILayout.Toggle(d.Profile == prof, ProfileName(prof), Theme.Segment)) d.Profile = prof;
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            foreach (var prof in new[] { RampProfile.QuarterPipe, RampProfile.Walls })
-                if (GUILayout.Toggle(d.Profile == prof, ProfileName(prof), Theme.Segment)) d.Profile = prof;
-            GUILayout.EndHorizontal();
+            var profiles = new[] { RampProfile.Flat, RampProfile.Gutter, RampProfile.HalfPipe, RampProfile.QuarterPipe, RampProfile.Walls };
+            int prof = SegmentRow(System.Array.IndexOf(profiles, d.Profile), System.Array.ConvertAll(profiles, ProfileName));
+            if (prof >= 0) d.Profile = profiles[prof];
             d.thickness = Mathf.Clamp(FloatField("Thickness", "thick", d.thickness, 0.25f), 0.05f, 20f);
             if (d.Profile != RampProfile.Flat)
                 d.wallHeight = Mathf.Clamp(FloatField(d.Profile == RampProfile.Gutter ? "Depth" : "Wall height", "wallH", d.wallHeight, 0.25f), 0.1f, 50f);

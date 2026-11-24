@@ -23,6 +23,7 @@ namespace GTWLevelEditor
         {
             FixedUpdateLauncher();
             FixedUpdateMotion();
+            FixedUpdateJumpSurface();
         }
 
         /// <summary>Builds the pendulum: hub at the hinge (the object's position), rod, and the sticky bob.</summary>

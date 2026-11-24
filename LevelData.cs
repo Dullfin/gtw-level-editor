@@ -68,6 +68,8 @@ namespace GTWLevelEditor
         Normal,
         Slippery,
         Sticky,
+        /// <summary>Bounces you off at the object's launch speed, like a jump pad.</summary>
+        JumpPad,
     }
 
     /// <summary>A saved level. Written by LevelJson (JsonUtility per object), so fields must stay public.</summary>
@@ -133,6 +135,17 @@ namespace GTWLevelEditor
         public float phase;
         /// <summary>Pendulum: rod length from the hinge to the bob's centre.</summary>
         public float length = 3.2f;
+
+        // ---- cylinders only ----
+        /// <summary>An open tube instead of a solid cylinder.</summary>
+        public bool hollow;
+        /// <summary>A hollow cylinder's wall thickness in metres.</summary>
+        public float wallThickness = 0.4f;
+        /// <summary>A hollow cylinder that cuts a hole through the platforms it passes through.</summary>
+        public bool cutsPlatforms;
+
+        /// <summary>Jump pad surface: how far above the top (m) the launch zone reaches, so you bounce before touching it. 0 = on contact only.</summary>
+        public float padHeight = 0.6f;
 
         // ---- ramps only ----
         public List<RampPoint> points = new List<RampPoint>();
@@ -221,7 +234,11 @@ namespace GTWLevelEditor
 
         /// <summary>Solid shapes that the player rolls on; only these use <see cref="surface"/>.</summary>
         public bool IsSolidShape => Kind <= ObjectKind.Sphere || Kind == ObjectKind.Ramp;
-        public bool HasForce => Kind == ObjectKind.JumpPad || Kind == ObjectKind.Bumper || Kind == ObjectKind.Launcher || Kind == ObjectKind.WallLauncher;
+        public bool HasForce => Kind == ObjectKind.JumpPad || Kind == ObjectKind.Bumper || Kind == ObjectKind.Launcher || Kind == ObjectKind.WallLauncher ||
+                                (IsSolidShape && Surface == SurfaceType.JumpPad);
+        public bool IsHollow => Kind == ObjectKind.Cylinder && hollow;
+        /// <summary>Shapes with a flat top, where a Jump pad surface can have a launch zone above it.</summary>
+        public bool HasJumpZone => Surface == SurfaceType.JumpPad && (Kind == ObjectKind.Platform || Kind == ObjectKind.Cylinder || Kind == ObjectKind.Sphere) && padHeight > 0.001f;
         public bool IsLauncher => Kind == ObjectKind.Launcher || Kind == ObjectKind.WallLauncher || Kind == ObjectKind.CogLauncher;
     }
 }

@@ -56,8 +56,8 @@ The bar at the top of the screen shows what each number key places. In mouse mod
 | Delete | Delete the object you're aiming at |
 | Q / E | Turn 15° |
 | R / F | Tilt 15° |
-| T | Reset rotation |
-| Mouse wheel | Resize (Shift: height only; Alt: distance in the air) |
+| T | Reset rotation and distance |
+| Mouse wheel | Resize (Shift: height only; Ctrl: pull the object closer or push it further away; it floats at that distance unless something nearer is under the crosshair) |
 | [ / ] | Lower / raise the launch speed of a jump pad, bumper or launcher (Shift: steps of 5) |
 | G | Toggle grid snapping (0.5 m steps, 15° turns). It's off by default, so placing and dragging are smooth |
 | H | Hide or show your character, so it doesn't block the view |
@@ -77,8 +77,8 @@ Click to drop points, and the track bends smoothly through them. A preview follo
 | Mouse wheel | Raise / lower the next point (0.5 m steps) |
 | Shift + wheel | Width of the next point |
 | Q / E | Bank the next point by 5° (Shift: 15°) |
-| T | Reset height and bank |
-| Alt + wheel | Distance of the point when aiming at the sky |
+| T | Reset height, bank and distance |
+| Ctrl + wheel | Pull the next point closer or push it further away. It floats at that distance unless something nearer is under the crosshair |
 
 Start a ramp on the end of another ramp (the marker turns green) and it continues smoothly with the same width and bank.
 
@@ -104,7 +104,7 @@ A selected ramp's panel has:
 | Ctrl+D | Duplicate the selection |
 | Ctrl+C / Ctrl+V | Copy / paste |
 
-The panel shows the selected object's position, rotation, size, colour, surface, launch speed and motion. It also has save, load and the level's kill height. Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift for fine changes), or type an exact number.
+The panel shows the selected object's position, rotation, size, colour, surface, launch speed and motion. It also has save, load and the level's kill height. Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift for fine changes), or type an exact number. Drag the panel's bottom-right corner to resize it; it remembers its size.
 
 ## Objects
 
@@ -112,6 +112,8 @@ The panel shows the selected object's position, rotation, size, colour, surface,
   - **Normal.**
   - **Slippery:** ice. You keep your speed and can steer only a little, so place it where the player arrives fast.
   - **Sticky:** grab it to stick on, even upside down.
+  - **Jump pad:** throws you off at the launch speed, so any platform, cylinder, sphere, wedge or ramp can be a jump pad. Tilt it to aim. Platforms, cylinders and spheres have a **Launch zone** slider (0–3 m, 0.6 m by default): an orange box above the top that throws you before you touch the surface. Wedges and ramps, or a zone set to "off", bounce you on contact.
+- **Hollow cylinder:** tick **Hollow** on a selected cylinder to make it an open tube you can roll through, and set its wall thickness. Size X / Z set the outside diameter and Y the length; rotate it to lie it on its side. Tick **Cut through platforms** under it and the tube cuts a hole in any platform it passes straight through, so you can roll through the tube. The tube has to run along one of the platform's axes, and its opening has to fit inside the platform.
 - **Launcher:** the game's slingshot. Roll onto the orange carriage and hold Grab. It locks you on, shoots along its arrow and throws you at its launch speed. Tilt it with Rotation X. The panel sets the travel and launch speed, and a yellow line previews the path while editing.
 - **Wall launcher:** the same slingshot mounted on a wall.
 - **Cog launcher:** the game's giant spinning cog. Grab it to ride it, and let go to fly off with its speed. Negative spin turns it the other way.
@@ -152,6 +154,7 @@ Files saved by versions before 0.4 contain no objects (an old bug lost them on s
 | `Keys/ToggleEditor` | F8 | Switch between editing and playing |
 | `Keys/TogglePanel` | Tab | Mouse mode and the panel |
 | `Editor/UiScale` | 1 | Editor UI size. The UI already scales with screen height, so it looks the same at 1080p and 4K. Raise it to make the UI bigger |
+| `Editor/PanelSize` | 440 × 640 | Size of the mouse-mode panel (drag its bottom-right corner to change it) |
 | `Editor/FlyVerticalSpeed` | 8 | Fly up / down speed in m/s |
 | `Editor/GridSnap` | false | Start with grid snapping on (also G in game) |
 | `Editor/HidePlayerInEditor` | false | Hide your character while editing (also H in game, or the panel checkbox) |

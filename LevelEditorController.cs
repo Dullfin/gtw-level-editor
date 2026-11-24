@@ -40,6 +40,8 @@ namespace GTWLevelEditor
         private LevelObject _selected;
         private Vector3 _ghostEuler;
         private float _ghostDistance = 10f;
+        /// <summary>How far away (m) the object being placed sits, set with Ctrl + wheel. 0 = on whatever the crosshair hits.</summary>
+        private float _ghostReach;
         private Vector3 _frozenPlayerPos;
         private bool _savedRestart, _savedRestartStart, _savedHighSpeed;
 
@@ -119,6 +121,7 @@ namespace GTWLevelEditor
             ReadMouse();
             RunPendingFileAction();
             UpdatePlayerVisibility();
+            if (CustomSession.Active && _sessionReady) UpdateTubeCuts();
             _onTitle = CustomSession.IsOnTitleScreen();
             if (_onTitle) EnsureTitleButton();
             if (CustomSession.Active && !_sessionReady && _onTitle && Time.unscaledTime - _beginTime > 20f)
@@ -322,7 +325,11 @@ namespace GTWLevelEditor
             if (Input.GetKeyDown(KeyCode.E)) _ghostEuler.y += 15f;
             if (Input.GetKeyDown(KeyCode.R)) _ghostEuler.x -= 15f;
             if (Input.GetKeyDown(KeyCode.F)) _ghostEuler.x += 15f;
-            if (Input.GetKeyDown(KeyCode.T)) _ghostEuler = LevelObjectData.CreateDefault(_kind).rotation; // launchers start tilted
+            if (Input.GetKeyDown(KeyCode.T))
+            {
+                _ghostEuler = LevelObjectData.CreateDefault(_kind).rotation; // launchers start tilted
+                _ghostReach = 0f;
+            }
 
             // ---- launch speed: the aimed-at jump pad/bumper if there is one, otherwise the one being placed ----
             bool lower = Input.GetKeyDown(KeyCode.LeftBracket), raise = Input.GetKeyDown(KeyCode.RightBracket);
@@ -344,7 +351,12 @@ namespace GTWLevelEditor
             if (wheel != 0f)
             {
                 float factor = Mathf.Pow(1.1f, wheel);
-                if (Input.GetKey(KeyCode.LeftAlt)) _ghostDistance = Mathf.Clamp(_ghostDistance * factor, 2f, 60f);
+                if (Ctrl)
+                {
+                    // Start from where it is now, so the first notch pulls it in from the surface.
+                    if (_ghostReach <= 0f) _ghostReach = Vector3.Distance(CenterRay().origin, _ghost.Data.position);
+                    _ghostReach = Mathf.Clamp(_ghostReach * factor, 2f, 120f);
+                }
                 else if (_ghost.IsRamp) { } // a copied ramp keeps its shape
                 else if (fast) _ghost.Data.scale.y = Mathf.Clamp(_ghost.Data.scale.y * factor, 0.05f, 100f);
                 else _ghost.Data.scale = ClampScale(_ghost.Data.scale * factor);
@@ -400,7 +412,8 @@ namespace GTWLevelEditor
 
             var ray = CenterRay();
             Vector3 pos;
-            if (RaycastSurface(ray, 80f, out var hit))
+            // A surface closer than the chosen distance still catches it; otherwise it floats at that distance.
+            if (RaycastSurface(ray, _ghostReach > 0f ? _ghostReach : 80f, out var hit))
             {
                 // Push the object out along the surface normal by its half-size in that direction.
                 var b = ghost.GetBounds();
@@ -410,7 +423,7 @@ namespace GTWLevelEditor
             }
             else
             {
-                pos = ray.GetPoint(_ghostDistance);
+                pos = ray.GetPoint(_ghostReach > 0f ? _ghostReach : _ghostDistance);
             }
             if (_snap) pos = new Vector3(Snap(pos.x), Snap(pos.y), Snap(pos.z));
             ghost.Data.position = pos;
@@ -780,8 +793,8 @@ namespace GTWLevelEditor
                 {
                     Cursor.visible = true;
                     Cursor.lockState = CursorLockMode.None;
-                    _window.width = 440;
-                    _window = GUILayout.Window(0x4C45, _window, DrawWindow, "Level Editor");
+                    if (!_resizingPanel) ApplyPanelSize();
+                    _window = GUILayout.Window(0x4C45, _window, DrawWindow, "Level Editor", GUILayout.Width(_window.width), GUILayout.Height(_window.height));
                 }
                 else
                 {
@@ -838,8 +851,9 @@ namespace GTWLevelEditor
         {
             const string gap = "      ";
             string what = _rampTool
-                ? $"Drawing a <b>ramp</b>  <color={Theme.MutedHex}>{_draft.Count} points · width {_draftWidth:0.#} m · height +{_draftHeight:0.#} m · bank {_draftBank:0}°</color>"
-                : $"Placing <b>{KindName(_kind)}</b>" + (_ghost != null && _ghost.Data.HasForce ? $"  <color={Theme.MutedHex}>{_ghost.Data.force:0} m/s</color>" : "");
+                ? $"Drawing a <b>ramp</b>  <color={Theme.MutedHex}>{_draft.Count} points · width {_draftWidth:0.#} m · height +{_draftHeight:0.#} m · bank {_draftBank:0}°" + (_draftReach > 0f ? $" · {_draftReach:0} m away" : "") + "</color>"
+                : $"Placing <b>{KindName(_kind)}</b>" + (_ghost != null && _ghost.Data.HasForce ? $"  <color={Theme.MutedHex}>{_ghost.Data.force:0} m/s</color>" : "")
+                  + (_ghostReach > 0f ? $"  <color={Theme.MutedHex}>{_ghostReach:0} m away</color>" : "");
             string text = $"{what}{gap}<color={Theme.MutedHex}>Snap {(_snap ? "on" : "off")}</color>{gap}{K(CursorModeKey.Value.ToString())} mouse mode{gap}{K(ToggleEditorKey.Value.ToString())} play";
             if (!HelpCompact.Value)
             {
@@ -850,13 +864,13 @@ namespace GTWLevelEditor
                             $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} duplicate{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
                 else if (_rampTool)
                     text += $"\n{K("Click")} add a point; the ramp curves smoothly through them. Start on another ramp's end to join it." +
-                            $"\n{K("Wheel")} height of the next point{gap}{K("Shift+Wheel")} width{gap}{K("Q")} / {K("E")} bank{gap}{K("T")} reset{gap}{K("Alt+Wheel")} distance in the air" +
+                            $"\n{K("Wheel")} height of the next point{gap}{K("Shift+Wheel")} width{gap}{K("Q")} / {K("E")} bank{gap}{K("T")} reset{gap}{K("Ctrl+Wheel")} pull the point closer / push it away" +
                             $"\n{K("Backspace")} remove the last point{gap}{K("Enter")} or click the last point again: finish" +
                             $"\n{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast{gap}{K("G")} grid snap{gap}{K("Tab")} afterwards to fine-tune the points";
                 else
                     text += $"\n{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast" +
                             $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{K("Delete")} delete{gap}{K("Q")} / {K("E")} turn{gap}{K("R")} / {K("F")} tilt{gap}{K("T")} reset{gap}{K("G")} snap" +
-                            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Alt+Wheel")} distance{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
+                            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Ctrl+Wheel")} pull closer / push away{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
                             $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} pick up a copy of the aimed object{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
             }
             GUI.Label(new Rect(18, 44, _helpRect.width - 130, _helpRect.height - 50), text, _hudStyle);
@@ -999,7 +1013,7 @@ namespace GTWLevelEditor
         private void DrawWindow(int id)
         {
             if (GUI.Button(new Rect(_window.width - 48, 12, 32, 30), "×", Theme.Close)) SetCursorMode(false);
-            _scroll = GUILayout.BeginScrollView(_scroll);
+            BeginPanelScroll();
 
             // The selected object comes first: it's what you edit most.
             if (_selected == null)
@@ -1051,7 +1065,8 @@ namespace GTWLevelEditor
             }
             GUILayout.Label(LevelsDirectory, Theme.Hint);
 
-            GUILayout.EndScrollView();
+            EndPanelScroll();
+            DrawPanelGrip();
             GUI.DragWindow(new Rect(0, 0, _window.width - 56, 46));
         }
 
@@ -1066,6 +1081,17 @@ namespace GTWLevelEditor
             if (d.Kind == ObjectKind.Ramp) DrawRampFields(obj);
             else if (d.Kind == ObjectKind.Pendulum) d.length = Mathf.Clamp(FloatField("Length m", "len", d.length, 0.25f), 0.5f, 40f);
             else d.scale = ClampScale(VectorField("Size", "scl", d.scale, 0.25f));
+            if (d.Kind == ObjectKind.Cylinder)
+            {
+                d.hollow = GUILayout.Toggle(d.hollow, "Hollow (an open tube you can roll through)");
+                if (d.hollow)
+                {
+                    float maxWall = Mathf.Max(0.05f, Mathf.Min(d.scale.x, d.scale.z) * 0.5f - 0.05f);
+                    d.wallThickness = Mathf.Clamp(FloatField("Wall m", "wall", d.wallThickness, 0.1f), 0.05f, maxWall);
+                    d.cutsPlatforms = GUILayout.Toggle(d.cutsPlatforms, "Cut through platforms (a hole where it passes through one)");
+                    GUILayout.Label("Size X / Z set the outside diameter and Y the length. Turn it with Rotation to lie it on its side.", Theme.Hint);
+                }
+            }
             if (d.HasForce) d.force = Mathf.Max(0f, FloatField("Launch m/s", "force", d.force, 1f));
             if (d.Kind == ObjectKind.Launcher || d.Kind == ObjectKind.WallLauncher)
             {
@@ -1081,17 +1107,33 @@ namespace GTWLevelEditor
             if (d.IsSolidShape)
             {
                 GUILayout.Space(2);
-                GUILayout.BeginHorizontal();
-                GUILayout.Label("Surface", GUILayout.Width(70));
-                foreach (SurfaceType s in Enum.GetValues(typeof(SurfaceType)))
+                GUILayout.Label("Surface", Theme.Hint);
+                var surfaces = (SurfaceType[])Enum.GetValues(typeof(SurfaceType));
+                int chosen = SegmentRow(Array.IndexOf(surfaces, d.Surface), Array.ConvertAll(surfaces, s => s == SurfaceType.JumpPad ? "Jump pad" : s.ToString()));
+                if (chosen >= 0 && surfaces[chosen] != d.Surface)
                 {
-                    if (GUILayout.Toggle(d.Surface == s, s.ToString(), Theme.Segment)) d.Surface = s;
+                    d.Surface = surfaces[chosen];
+                    if (d.Surface == SurfaceType.JumpPad && d.force <= 0f) d.force = 20f;
                 }
-                GUILayout.EndHorizontal();
                 if (d.Surface == SurfaceType.Slippery)
                     GUILayout.Label("Icy: almost no grip, so you keep your speed and steer weakly.", Theme.Hint);
                 else if (d.Surface == SurfaceType.Sticky)
                     GUILayout.Label("Grab it to stick on, even upside down.", Theme.Hint);
+                else if (d.Surface == SurfaceType.JumpPad)
+                {
+                    if (d.Kind == ObjectKind.Platform || d.Kind == ObjectKind.Cylinder || d.Kind == ObjectKind.Sphere)
+                    {
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label("Launch zone", GUILayout.Width(110));
+                        d.padHeight = GUILayout.HorizontalSlider(d.padHeight, 0f, 3f, GUILayout.ExpandWidth(true));
+                        GUILayout.Label(d.padHeight < 0.01f ? "off" : $"{d.padHeight:0.00} m", GUILayout.Width(64));
+                        GUILayout.EndHorizontal();
+                        d.padHeight = d.padHeight < 0.02f ? 0f : Mathf.Round(d.padHeight * 20f) / 20f;
+                        GUILayout.Label("The orange box: rolling into it throws you along the pad's up, before you touch the top. At \"off\" you bounce on contact.", Theme.Hint);
+                    }
+                    else
+                        GUILayout.Label("Bounces you off the surface you land on at the launch speed. Tilt it to aim.", Theme.Hint);
+                }
             }
 
             GUILayout.BeginHorizontal();
