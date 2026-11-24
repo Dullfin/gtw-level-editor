@@ -17,7 +17,7 @@ Custom levels run in an empty Doinkler world, and **the game's saves are switche
 You need Get To Work with [BepInEx 5](https://github.com/BepInEx/BepInEx) installed.
 
 1. Build the plugin (see [Building](#building)). The build copies `GTWLevelEditor.dll` into `Get To Work\BepInEx\plugins` for you.
-2. To get the example levels, copy the files in [`Levels/`](Levels) into `Get To Work\BepInEx\LevelEditor\Levels\`. Create the folder if it doesn't exist yet. The game creates it the first time you save a level.
+2. To get the example levels, open the Level Editor menu in game, click **Import level…** and pick the files in [`Levels/`](Levels). You can also copy them into `Get To Work\BepInEx\LevelEditor\Levels\` yourself.
 
 ## Included levels
 
@@ -132,7 +132,12 @@ While editing, paths are drawn in blue. In play mode, standing on a moving piece
 
 ## Saving and sharing levels
 
-Levels are saved as JSON in `Get To Work\BepInEx\LevelEditor\Levels\`. To share a level, send the file. To play someone else's, drop their file into that folder.
+Levels are saved as JSON in `Get To Work\BepInEx\LevelEditor\Levels\`, one file per level. The title screen's Level Editor menu manages them:
+
+- **Export** (on a level's row) saves a copy of the level file wherever you choose, ready to send to someone.
+- **Import level…** picks a level file and adds it to your saved levels. If you already have a level with that name, the import gets " (2)" added to its name.
+- **Delete** (on a level's row, then confirm) moves the level file to the Windows Recycle Bin, so you can still restore it.
+- **Open levels folder** opens the folder in Explorer.
 
 Files saved by versions before 0.4 contain no objects (an old bug lost them on save), so they open as empty levels.
 

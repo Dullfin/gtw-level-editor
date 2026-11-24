@@ -117,6 +117,7 @@ namespace GTWLevelEditor
         private void Update()
         {
             ReadMouse();
+            RunPendingFileAction();
             _onTitle = CustomSession.IsOnTitleScreen();
             if (_onTitle) EnsureTitleButton();
             if (CustomSession.Active && !_sessionReady && _onTitle && Time.unscaledTime - _beginTime > 20f)
@@ -869,7 +870,7 @@ namespace GTWLevelEditor
             }
             if (!_titleMenuOpen) return;
 
-            _titleRect.width = 460;
+            _titleRect.width = 620;
             if (_titleRect.x == 0 && _titleRect.y == 0)
                 _titleRect.position = new Vector2(VW - _titleRect.width - 40, 40); // over the logo, clear of the game's buttons
             _titleRect = GUILayout.Window(0x4C47, _titleRect, DrawTitleWindow, "Level Editor");
@@ -893,19 +894,13 @@ namespace GTWLevelEditor
 
             Theme.Section("Saved levels");
             _titleScroll = GUILayout.BeginScrollView(_titleScroll, GUILayout.Height(230));
-            if (_levelFiles.Length == 0) GUILayout.Label("No saved levels yet. Make one and press Save in the editor panel.", Theme.Hint);
-            foreach (var file in _levelFiles)
-            {
-                GUILayout.BeginHorizontal(Theme.Row);
-                GUILayout.Label(file, Theme.Title, GUILayout.ExpandWidth(true));
-                if (GUILayout.Button("Play", Theme.AccentButton, GUILayout.Width(70))) BeginFromFile(file, edit: false);
-                if (GUILayout.Button("Edit", GUILayout.Width(70))) BeginFromFile(file, edit: true);
-                GUILayout.EndHorizontal();
-            }
+            if (_levelFiles.Length == 0) GUILayout.Label("No saved levels yet. Make one and press Save in the editor panel, or import one.", Theme.Hint);
+            foreach (var file in _levelFiles) DrawSavedLevelRow(file);
             GUILayout.EndScrollView();
+            GUILayout.Space(6);
+            DrawLevelFileButtons();
 
-            if (!string.IsNullOrEmpty(_titleError))
-                GUILayout.Label($"<color=#FF8A80>{_titleError}</color>", Theme.Hint);
+            DrawTitleMessages();
             GUI.DragWindow(new Rect(0, 0, _titleRect.width - 56, 46));
         }
 
