@@ -293,7 +293,7 @@ namespace GTWLevelEditor
             }
 
             // ---- flying ----
-            float vertical = (Input.GetKey(KeyCode.Space) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftControl) ? 1f : 0f);
+            float vertical = (Input.GetKey(KeyCode.Space) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftAlt) ? 1f : 0f);
             bool fast = Input.GetKey(KeyCode.LeftShift);
             p.noClipHighSpeedMode = fast;
             if (vertical != 0f)
@@ -852,9 +852,9 @@ namespace GTWLevelEditor
                     text += $"\n{K("Click")} add a point; the ramp curves smoothly through them. Start on another ramp's end to join it." +
                             $"\n{K("Wheel")} height of the next point{gap}{K("Shift+Wheel")} width{gap}{K("Q")} / {K("E")} bank{gap}{K("T")} reset{gap}{K("Alt+Wheel")} distance in the air" +
                             $"\n{K("Backspace")} remove the last point{gap}{K("Enter")} or click the last point again: finish" +
-                            $"\n{K("Space")} / {K("Ctrl")} fly up / down{gap}{K("Shift")} fast{gap}{K("G")} grid snap{gap}{K("Tab")} afterwards to fine-tune the points";
+                            $"\n{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast{gap}{K("G")} grid snap{gap}{K("Tab")} afterwards to fine-tune the points";
                 else
-                    text += $"\n{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Ctrl")} fly up / down{gap}{K("Shift")} fast" +
+                    text += $"\n{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast" +
                             $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{K("Delete")} delete{gap}{K("Q")} / {K("E")} turn{gap}{K("R")} / {K("F")} tilt{gap}{K("T")} reset{gap}{K("G")} snap" +
                             $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Alt+Wheel")} distance{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
                             $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} pick up a copy of the aimed object{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";

@@ -32,7 +32,7 @@ namespace GTWLevelEditor
             editor.CursorModeKey = Config.Bind("Keys", "TogglePanel", new KeyboardShortcut(KeyCode.Tab),
                 "While editing: show the mouse cursor and the save/load/properties panel.");
             editor.FlyVerticalSpeed = Config.Bind("Editor", "FlyVerticalSpeed", 8f,
-                "Speed in m/s when flying up (Space) or down (Left Ctrl) in the editor.");
+                "Speed in m/s when flying up (Space) or down (Left Alt) in the editor.");
             editor.HelpPosition = Config.Bind("Editor", "HelpWindowPosition", new Vector2(10f, 10f),
                 "Screen position of the help window. Drag it while the panel is open to change this.");
             editor.HelpCompact = Config.Bind("Editor", "HelpWindowCompact", false,

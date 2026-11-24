@@ -100,3 +100,23 @@ namespace GTWLevelEditor
         }
     }
 }
+
+namespace GTWLevelEditor
+{
+    /// <summary>
+    /// While editing, the editor flies you up and down itself (Space / Left Alt), so the game's own
+    /// no-clip up / down buttons are switched off: they share Ctrl with the editor's shortcuts.
+    /// </summary>
+    [HarmonyLib.HarmonyPatch(typeof(Isto.Core.Inputs.Controls), nameof(Isto.Core.Inputs.Controls.GetButton))]
+    internal static class EditorNoClipKeys
+    {
+        private static void Postfix(Isto.Core.Inputs.UserActions action, ref bool __result)
+        {
+            if (!__result || action == null) return;
+            var editor = LevelEditorController.Instance;
+            if (editor == null || !editor.IsEditing) return;
+            if (action.Name == Isto.GTW.Inputs.GTWUserActions.NOCLIPMOVEDOWN.Name || action.Name == Isto.GTW.Inputs.GTWUserActions.NOCLIPMOVEUP.Name)
+                __result = false;
+        }
+    }
+}

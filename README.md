@@ -47,7 +47,7 @@ The bar at the top of the screen shows what each number key places. In mouse mod
 | Key | Action |
 |---|---|
 | Move controls | Fly |
-| Space / Left Ctrl | Fly up / down |
+| Space / Left Alt | Fly up / down |
 | Left Shift | Fly faster |
 | 1 to 0 | Platform, Ramp, Wedge, Cylinder, Sphere, Jump pad, Bumper, Launcher, Wall launcher, Cog launcher |
 | Shift + 1 to 5 | Checkpoint, Start, Finish, Kill zone, Pendulum |
