@@ -173,6 +173,19 @@ The project compiles against the game's own DLLs and BepInEx's core DLLs, so no 
 
 Close the game before building, or the copy fails because the DLL is in use.
 
+### Project layout
+
+| Folder | What's in it |
+|---|---|
+| `src/Plugin.cs` | The BepInEx entry point: settings and Harmony patches |
+| `src/Game/` | Hooks into the game: loading an empty Doinkler world, the player and camera, blocking saves, ice physics |
+| `src/Level/` | The level data and its JSON format |
+| `src/Objects/` | Placed objects in the world: shapes, ramps, launchers, moving pieces, hollow tubes and the holes they cut |
+| `src/Editor/` | The editor itself: placing, handles, ramp drawing, motion, the panel, theme and the scripted demo |
+| `src/Title/` | The title screen button and the Level Editor menu's import, export and delete |
+| `src/Debug/` | Debug commands and test aids (auto-forward, auto-grab), only active when enabled in the config |
+| `Levels/` | Example levels |
+
 ## Debug commands
 
 With `EnableDebugCommands` on, the game runs lines written to `BepInEx\LevelEditor\Debug\commands.txt` and writes results and screenshots to the same folder. These are for development and testing.
