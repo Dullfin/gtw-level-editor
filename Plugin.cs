@@ -37,6 +37,10 @@ namespace GTWLevelEditor
                 "Screen position of the help window. Drag it while the panel is open to change this.");
             editor.HelpCompact = Config.Bind("Editor", "HelpWindowCompact", false,
                 "Show only the status line in the help window.");
+            editor.HidePlayerInEditor = Config.Bind("Editor", "HidePlayerInEditor", false,
+                "Hide your character while editing so it doesn't block the view (toggle in game with H).");
+            editor.GridSnap = Config.Bind("Editor", "GridSnap", false,
+                "Start with grid snapping on (0.5 m steps, 15° turns). Toggle in game with G.");
             editor.UiScale = Config.Bind("Editor", "UiScale", 1f,
                 "Size of the editor UI. 1 = sized for the screen height (the same proportion at 1080p and 4K); 1.25 = 25% bigger.");
             editor.LevelsDirectory = Path.Combine(Paths.BepInExRootPath, "LevelEditor", "Levels");

@@ -217,7 +217,8 @@ namespace GTWLevelEditor
             if (cam == null) return;
             var mouse = MouseGui;
 
-            if (!typing)
+            bool flying = Input.GetMouseButton(1);
+            if (!typing && !flying)
             {
                 if (!Ctrl && Input.GetKeyDown(KeyCode.W)) _gizmo = GizmoMode.Move;
                 if (!Ctrl && Input.GetKeyDown(KeyCode.E)) _gizmo = GizmoMode.Rotate;
@@ -248,6 +249,7 @@ namespace GTWLevelEditor
                 _lookYaw += delta.x * 0.15f;
                 _lookPitch = Mathf.Clamp(_lookPitch - delta.y * 0.15f, -89f, 89f);
                 cam.transform.rotation = Quaternion.Euler(_lookPitch, _lookYaw, 0f);
+                if (!typing) FlyMouseModeCamera(cam);
             }
             float wheel = Input.mouseScrollDelta.y;
             if (wheel != 0f && !MouseOverWindow()) cam.transform.position += cam.transform.forward * wheel * (Shift ? 4f : 1.5f);

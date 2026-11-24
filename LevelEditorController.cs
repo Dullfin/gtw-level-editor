@@ -34,7 +34,7 @@ namespace GTWLevelEditor
         // ---- editor state ----
         public bool IsEditing { get; private set; }
         private bool _cursorMode;
-        private bool _snap = true;
+        private bool _snap;
         private ObjectKind _kind = ObjectKind.Platform;
         private LevelObject _ghost;
         private LevelObject _selected;
@@ -118,6 +118,7 @@ namespace GTWLevelEditor
         {
             ReadMouse();
             RunPendingFileAction();
+            UpdatePlayerVisibility();
             _onTitle = CustomSession.IsOnTitleScreen();
             if (_onTitle) EnsureTitleButton();
             if (CustomSession.Active && !_sessionReady && _onTitle && Time.unscaledTime - _beginTime > 20f)
@@ -246,6 +247,7 @@ namespace GTWLevelEditor
             var p = GameBridge.Player;
             IsEditing = true;
             _timerRunning = false;
+            _snap = GridSnap != null && GridSnap.Value;
             _savedRestart = p.restartAbilityAvailable;
             _savedRestartStart = p.restartStartingCheckpointAbilityAvailable;
             _savedHighSpeed = p.noClipHighSpeedMode;
@@ -279,6 +281,7 @@ namespace GTWLevelEditor
             if (CursorModeKey.Value.IsDown()) SetCursorMode(!_cursorMode);
             bool typing = GUIUtility.keyboardControl != 0;
             if (!typing) HandleShortcuts();
+            if (!typing && !Ctrl && Input.GetKeyDown(HidePlayerKey)) TogglePlayerHidden();
 
             if (_cursorMode)
             {
@@ -304,7 +307,7 @@ namespace GTWLevelEditor
                 if (Input.GetKeyDown(HotbarKeys[i]) && !Ctrl && Shift == HotbarNeedsShift(i)) SetKind(Hotbar[i]);
             }
 
-            if (Input.GetKeyDown(KeyCode.G) && !Ctrl) { _snap = !_snap; Toast(_snap ? "Grid snap on" : "Grid snap off"); }
+            if (Input.GetKeyDown(KeyCode.G) && !Ctrl) SetSnap(!_snap);
 
             if (_rampTool)
             {
@@ -416,6 +419,13 @@ namespace GTWLevelEditor
 
         private static float Snap(float v) => Mathf.Round(v * 2f) / 2f;
 
+        private void SetSnap(bool on)
+        {
+            _snap = on;
+            if (GridSnap != null) GridSnap.Value = on;
+            Toast(on ? "Grid snap on (0.5 m, 15°)" : "Grid snap off");
+        }
+
         private bool RaycastSurface(Ray ray, float distance, out RaycastHit best)
         {
             best = default;
@@ -525,10 +535,12 @@ namespace GTWLevelEditor
             if (on)
             {
                 _frozenPlayerPos = GameBridge.Player.PlayerTransform.position;
+                RememberMouseModeCamera();
                 RefreshLevelList();
             }
             else
             {
+                HandCameraBackToPlayer();
                 GUIUtility.keyboardControl = 0; // a text field left focused would block the shortcuts
                 SaveHelpPosition();
                 Cursor.visible = false;
@@ -834,7 +846,7 @@ namespace GTWLevelEditor
                 if (_cursorMode)
                     text += $"\n{K("Click")} select an object, then drag its handles{gap}{K("W")} move (yellow square: along the ground){gap}{K("E")} rotate{gap}{K("R")} scale" +
                             $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down){gap}{K("Delete")} removes the chosen point or object" +
-                            $"\n{K("Right mouse")} look around{gap}{K("Wheel")} move the camera forward / back" +
+                            $"\n{K("Hold right mouse")} look around, with {K("W")}{K("A")}{K("S")}{K("D")} to fly, {K("Q")} / {K("E")} down / up{gap}{K("Wheel")} move forward / back{gap}{K("H")} hide player" +
                             $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} duplicate{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
                 else if (_rampTool)
                     text += $"\n{K("Click")} add a point; the ramp curves smoothly through them. Start on another ramp's end to join it." +
@@ -844,7 +856,7 @@ namespace GTWLevelEditor
                 else
                     text += $"\n{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Ctrl")} fly up / down{gap}{K("Shift")} fast" +
                             $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{K("Delete")} delete{gap}{K("Q")} / {K("E")} turn{gap}{K("R")} / {K("F")} tilt{gap}{K("T")} reset{gap}{K("G")} snap" +
-                            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Alt+Wheel")} distance{gap}{K("[")} / {K("]")} launch speed" +
+                            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Alt+Wheel")} distance{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
                             $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} pick up a copy of the aimed object{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
             }
             GUI.Label(new Rect(18, 44, _helpRect.width - 130, _helpRect.height - 50), text, _hudStyle);
@@ -1014,6 +1026,8 @@ namespace GTWLevelEditor
             if (GUILayout.Button("New (clear)", Theme.DangerButton)) { PushUndo(); ApplyLevel(LevelData.CreateNew(CustomSession.Environment)); MovePlayerToStart(); Toast("New level"); }
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
+            bool hide = GUILayout.Toggle(HidePlayerInEditor.Value, "Hide my character while editing (H)");
+            if (hide != HidePlayerInEditor.Value) HidePlayerInEditor.Value = hide;
             _level.useKillHeight = GUILayout.Toggle(_level.useKillHeight, "Respawn when falling below the kill height");
             if (_level.useKillHeight)
             {
@@ -1148,7 +1162,11 @@ namespace GTWLevelEditor
                 case EventType.MouseDrag:
                     if (GUIUtility.hotControl == id)
                     {
-                        value = _scrubStart + Mathf.Round((e.mousePosition.x - _scrubX) / 6f) * step;
+                        // Smooth: the value follows the mouse (one step per 12 px, Shift for fine),
+                        // snapping to whole steps only while grid snap is on.
+                        float steps = (e.mousePosition.x - _scrubX) / 12f * (e.shift ? 0.2f : 1f);
+                        value = _snap ? _scrubStart + Mathf.Round(steps) * step
+                                      : Mathf.Round((_scrubStart + steps * step) * 100f) / 100f;
                         _fieldText.Remove(key);
                         GUI.changed = true;
                         e.Use();

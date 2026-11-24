@@ -36,7 +36,7 @@ You need Get To Work with [BepInEx 5](https://github.com/BepInEx/BepInEx) instal
 
 The editor has two modes:
 - **Flying** (the default) is for building: fly around and place things at the crosshair.
-- **Mouse mode** (**Tab**) shows the cursor and the side panel. Use it for fine-tuning: select objects, drag their handles and edit exact values.
+- **Mouse mode** (**Tab**) shows the cursor and the side panel. Use it for fine-tuning: select objects, drag their handles and edit exact values. Hold right mouse and use WASD to fly the camera around. When you leave mouse mode, you carry on flying from where the camera ended up.
 
 The bar at the top of the screen shows what each number key places. In mouse mode you can click it.
 
@@ -59,7 +59,8 @@ The bar at the top of the screen shows what each number key places. In mouse mod
 | T | Reset rotation |
 | Mouse wheel | Resize (Shift: height only; Alt: distance in the air) |
 | [ / ] | Lower / raise the launch speed of a jump pad, bumper or launcher (Shift: steps of 5) |
-| G | Toggle 0.5 m grid snapping |
+| G | Toggle grid snapping (0.5 m steps, 15° turns). It's off by default, so placing and dragging are smooth |
+| H | Hide or show your character, so it doesn't block the view |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+D | Pick up a copy of the aimed object |
 | Ctrl+C / Ctrl+V | Copy the aimed object / hold a copy to place |
@@ -96,13 +97,14 @@ A selected ramp's panel has:
 | Drag an arrow, ring or box | Move along an axis, rotate, or scale. The yellow square moves along the ground; the white centre box scales evenly |
 | Drag a ramp's white points | Reshape the ramp (hold Shift to move a point up or down) |
 | Delete | Delete the chosen ramp point, or the selected object |
-| Hold right mouse | Look around |
+| Hold right mouse | Look around. While holding it, W / A / S / D fly the camera, Q / E (or Space) go down / up, and Shift goes faster |
 | Mouse wheel | Move the camera forward / back |
+| H | Hide or show your character |
 | Ctrl+Z / Ctrl+Y | Undo / redo (panel edits included) |
 | Ctrl+D | Duplicate the selection |
 | Ctrl+C / Ctrl+V | Copy / paste |
 
-The panel shows the selected object's position, rotation, size, colour, surface, launch speed and motion. It also has save, load and the level's kill height.
+The panel shows the selected object's position, rotation, size, colour, surface, launch speed and motion. It also has save, load and the level's kill height. Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift for fine changes), or type an exact number.
 
 ## Objects
 
@@ -151,6 +153,8 @@ Files saved by versions before 0.4 contain no objects (an old bug lost them on s
 | `Keys/TogglePanel` | Tab | Mouse mode and the panel |
 | `Editor/UiScale` | 1 | Editor UI size. The UI already scales with screen height, so it looks the same at 1080p and 4K. Raise it to make the UI bigger |
 | `Editor/FlyVerticalSpeed` | 8 | Fly up / down speed in m/s |
+| `Editor/GridSnap` | false | Start with grid snapping on (also G in game) |
+| `Editor/HidePlayerInEditor` | false | Hide your character while editing (also H in game, or the panel checkbox) |
 | `Surfaces/SlipperyControl` | 0.3 | Steering kept on Slippery surfaces: 0 = pure ice, 1 = normal ground |
 | `Debug/EnableDebugCommands` | false | Development aid; see below |
 
@@ -193,4 +197,3 @@ With `EnableDebugCommands` on, the game runs lines written to `BepInEx\LevelEdit
 ## Limitations
 
 - Objects are simple shapes, not the game's own models.
-- Leaving mouse mode returns the camera to the player.
