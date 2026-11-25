@@ -532,7 +532,11 @@ namespace GTWLevelEditor
 
         private void Select(LevelObject obj)
         {
-            if (obj != _selected) _selectedPoint = -1;
+            if (obj != _selected)
+            {
+                _selectedPoint = -1;
+                if (obj != null) SetPanelTab(PanelTab.Object); // picking something shows its settings
+            }
             _selected = obj;
             _fieldText.Clear();
             _fieldTextOwner = obj;
@@ -747,7 +751,8 @@ namespace GTWLevelEditor
         {
             var m = MousePos;
             var p = new Vector2(m.x, Screen.height - m.y) / UiScaleFactor;
-            return _window.Contains(p) || _helpRect.Contains(p) || _hotbarRect.Contains(p);
+            if (Docked && (!GameViewRect.Contains(p) || DividerRect.Contains(p) || _draggingDivider)) return true; // the toolbar, the divider and the panel column
+            return _window.Contains(p) || (HelpVisible && _helpRect.Contains(p)) || _hotbarRect.Contains(p);
         }
 
         private GUISkin EditorSkin()
@@ -787,18 +792,28 @@ namespace GTWLevelEditor
 
             if (IsEditing)
             {
-                DrawHelp();
+                bool docked = Docked;
+                if (docked) DrawDockBackgrounds();
+                if (HelpVisible) DrawHelp();
                 DrawHotbar();
                 if (_cursorMode)
                 {
                     Cursor.visible = true;
                     Cursor.lockState = CursorLockMode.None;
+                }
+                if (docked)
+                {
+                    DrawDockDivider();
+                    DrawDockedPanel();
+                }
+                else if (_cursorMode)
+                {
                     if (!_resizingPanel) ApplyPanelSize();
                     _window = GUILayout.Window(0x4C45, _window, DrawWindow, "Level Editor", GUILayout.Width(_window.width), GUILayout.Height(_window.height));
                 }
-                else
+                if (!_cursorMode)
                 {
-                    var c = new Vector2(VW / 2f, VH / 2f);
+                    var c = GameViewRect.center;
                     Theme.ShadowLabel(new Rect(c.x - 15, c.y - 18, 30, 36), "+", _bigStyle);
                 }
             }
@@ -810,7 +825,8 @@ namespace GTWLevelEditor
             if (_message != null && Time.unscaledTime < _messageUntil)
             {
                 var size = Theme.Caption.CalcSize(new GUIContent(_message));
-                var r = new Rect((VW - size.x) / 2f - 28f, VH * 0.2f, size.x + 56f, 60f);
+                var view = GameViewRect;
+                var r = new Rect(view.center.x - size.x / 2f - 28f, view.y + view.height * 0.2f, size.x + 56f, 60f);
                 GUI.Box(r, GUIContent.none, Theme.Pill);
                 GUI.Label(r, _message, Theme.Caption);
             }
@@ -820,12 +836,14 @@ namespace GTWLevelEditor
 
         private void DrawHelp()
         {
-            var size = HelpCompact.Value ? new Vector2(760, 92) : new Vector2(Mathf.Min(VW - 20, 1000), 196);
+            // Kept inside the game area (the whole screen, or what the docked toolbar and panel leave).
+            var view = GameViewRect;
+            var size = HelpCompact.Value ? new Vector2(Mathf.Min(view.width - 20, 760), 92) : new Vector2(Mathf.Min(view.width - 20, 1000), 196);
             if (_helpPos == null) _helpPos = HelpPosition.Value;
             var pos = _helpPos.Value;
             _helpRect = new Rect(
-                Mathf.Clamp(pos.x, 0, Mathf.Max(0, VW - size.x)),
-                Mathf.Clamp(pos.y, 0, Mathf.Max(0, VH - size.y)),
+                Mathf.Clamp(pos.x, view.x, Mathf.Max(view.x, view.xMax - size.x)),
+                Mathf.Clamp(pos.y, view.y, Mathf.Max(view.y, view.yMax - size.y)),
                 size.x, size.y);
             var moved = GUI.Window(0x4C46, _helpRect, DrawHelpContents, _cursorMode ? "Controls  ·  drag to move" : "Controls");
             if (moved.position != _helpRect.position)
@@ -856,29 +874,36 @@ namespace GTWLevelEditor
                   + (_ghostReach > 0f ? $"  <color={Theme.MutedHex}>{_ghostReach:0} m away</color>" : "");
             string text = $"{what}{gap}<color={Theme.MutedHex}>Snap {(_snap ? "on" : "off")}</color>{gap}{K(CursorModeKey.Value.ToString())} mouse mode{gap}{K(ToggleEditorKey.Value.ToString())} play";
             if (!HelpCompact.Value)
-            {
-                if (_cursorMode)
-                    text += $"\n{K("Click")} select an object, then drag its handles{gap}{K("W")} move (yellow square: along the ground){gap}{K("E")} rotate{gap}{K("R")} scale" +
-                            $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down); a chosen point gets handles: {K("W")} move, {K("E")} bank, {K("R")} width. Click the ramp itself for whole-ramp handles" +
-                            $"\n{K("Delete")} removes the chosen point or object" +
-                            $"\n{K("Hold right mouse")} look around, with {K("W")}{K("A")}{K("S")}{K("D")} to fly, {K("Q")} / {K("E")} down / up{gap}{K("Wheel")} move forward / back{gap}{K("H")} hide player" +
-                            $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} duplicate{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
-                else if (_rampTool)
-                    text += $"\n{K("Click")} add a point; the ramp curves smoothly through them. Start on another ramp's end to join it." +
-                            $"\n{K("Wheel")} height of the next point{gap}{K("Shift+Wheel")} width{gap}{K("Q")} / {K("E")} bank{gap}{K("T")} reset{gap}{K("Ctrl+Wheel")} pull the point closer / push it away" +
-                            $"\n{K("Backspace")} remove the last point{gap}{K("Enter")} or click the last point again: finish" +
-                            $"\n{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast{gap}{K("G")} grid snap{gap}{K("Tab")} afterwards to fine-tune the points";
-                else
-                    text += $"\n{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast" +
-                            $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{K("Delete")} delete{gap}{K("Q")} / {K("E")} turn{gap}{K("R")} / {K("F")} tilt{gap}{K("T")} reset{gap}{K("G")} snap" +
-                            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Ctrl+Wheel")} pull closer / push away{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
-                            $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} pick up a copy of the aimed object{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
-            }
-            GUI.Label(new Rect(18, 44, _helpRect.width - 130, _helpRect.height - 50), text, _hudStyle);
-            if (GUI.Button(new Rect(_helpRect.width - 96, 10, 80, 30), HelpCompact.Value ? "More" : "Less", Theme.GhostButton))
+                text += "\n" + (_cursorMode ? MouseModeControls(gap) : _rampTool ? RampControls(gap) : PlacingControls(gap));
+            GUI.Label(new Rect(18, 44, _helpRect.width - 170, _helpRect.height - 50), text, _hudStyle);
+            if (GUI.Button(new Rect(_helpRect.width - 136, 10, 80, 30), HelpCompact.Value ? "More" : "Less", Theme.GhostButton))
                 HelpCompact.Value = !HelpCompact.Value;
+            if (GUI.Button(new Rect(_helpRect.width - 48, 10, 32, 30), "×", Theme.Close))
+            {
+                HelpVisible = false;
+                Toast("Controls hidden. Reopen them from the panel's Controls tab", 3f);
+            }
             if (_cursorMode) GUI.DragWindow();
         }
+
+        private static string MouseModeControls(string gap) =>
+            $"{K("Click")} select an object, then drag its handles{gap}{K("W")} move (yellow square: along the ground){gap}{K("E")} rotate{gap}{K("R")} scale" +
+            $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down); a chosen point gets handles: {K("W")} move, {K("E")} bank, {K("R")} width. Click the ramp itself for whole-ramp handles" +
+            $"\n{K("Delete")} removes the chosen point or object" +
+            $"\n{K("Hold right mouse")} look around, with {K("W")}{K("A")}{K("S")}{K("D")} to fly, {K("Q")} / {K("E")} down / up{gap}{K("Wheel")} move forward / back{gap}{K("H")} hide player" +
+            $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} duplicate{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
+
+        private static string RampControls(string gap) =>
+            $"{K("Click")} add a point; the ramp curves smoothly through them. Start on another ramp's end to join it." +
+            $"\n{K("Wheel")} height of the next point{gap}{K("Shift+Wheel")} width{gap}{K("Q")} / {K("E")} bank{gap}{K("T")} reset{gap}{K("Ctrl+Wheel")} pull the point closer / push it away" +
+            $"\n{K("Backspace")} remove the last point{gap}{K("Enter")} or click the last point again: finish" +
+            $"\n{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast{gap}{K("G")} grid snap{gap}{K("Tab")} afterwards to fine-tune the points";
+
+        private static string PlacingControls(string gap) =>
+            $"{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast" +
+            $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{K("Delete")} delete{gap}{K("Q")} / {K("E")} turn{gap}{K("R")} / {K("F")} tilt{gap}{K("T")} reset{gap}{K("G")} snap" +
+            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Ctrl+Wheel")} pull closer / push away{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
+            $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} pick up a copy of the aimed object{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
 
         // ---------------- title screen menu ----------------
 
@@ -1013,23 +1038,40 @@ namespace GTWLevelEditor
 
         private void DrawWindow(int id)
         {
-            if (GUI.Button(new Rect(_window.width - 48, 12, 32, 30), "×", Theme.Close)) SetCursorMode(false);
+            bool docked = Docked;
+            if (!docked && GUI.Button(new Rect(_window.width - 48, 12, 32, 30), "×", Theme.Close)) SetCursorMode(false);
+            if (docked && !_cursorMode)
+                GUILayout.Label($"Press {CursorModeKey.Value} for mouse mode to use the panel.", Theme.Hint);
+            DrawPanelTabs();
             BeginPanelScroll();
+            switch (_panelTab)
+            {
+                case PanelTab.Object: DrawObjectTab(); break;
+                case PanelTab.Level: DrawLevelTab(); break;
+                case PanelTab.Saved: DrawSavedTab(); break;
+                case PanelTab.Controls: DrawControlsTab(); break;
+            }
+            EndPanelScroll();
+            if (docked) return; // fixed in place: no resize grip or dragging
+            DrawPanelGrip();
+            GUI.DragWindow(new Rect(0, 0, _window.width - 56, 46));
+        }
 
-            // The selected object comes first: it's what you edit most.
+        private void DrawObjectTab()
+        {
             if (_selected == null)
             {
-                Theme.Section("Selection");
                 GUILayout.Label("Nothing selected. Click an object in the world to select it.", Theme.Hint);
+                return;
             }
-            else
-            {
-                var sel = _selected;
-                string before = LevelJson.ObjectToJson(sel.Data);
-                DrawSelected(sel);
-                if (_objects.Contains(sel) && LevelJson.ObjectToJson(sel.Data) != before) NotePanelEdit(sel, before);
-            }
+            var sel = _selected;
+            string before = LevelJson.ObjectToJson(sel.Data);
+            DrawSelected(sel);
+            if (_objects.Contains(sel) && LevelJson.ObjectToJson(sel.Data) != before) NotePanelEdit(sel, before);
+        }
 
+        private void DrawLevelTab()
+        {
             Theme.Section($"Level  ·  World {CustomSession.Environment + 1}");
             GUILayout.BeginVertical(Theme.Card);
             GUILayout.BeginHorizontal();
@@ -1041,8 +1083,6 @@ namespace GTWLevelEditor
             if (GUILayout.Button("New (clear)", Theme.DangerButton)) { PushUndo(); ApplyLevel(LevelData.CreateNew(CustomSession.Environment)); MovePlayerToStart(); Toast("New level"); }
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
-            bool hide = GUILayout.Toggle(HidePlayerInEditor.Value, "Hide my character while editing (H)");
-            if (hide != HidePlayerInEditor.Value) HidePlayerInEditor.Value = hide;
             _level.useKillHeight = GUILayout.Toggle(_level.useKillHeight, "Respawn when falling below the kill height");
             if (_level.useKillHeight)
             {
@@ -1054,7 +1094,10 @@ namespace GTWLevelEditor
                 }
             }
             GUILayout.EndVertical();
+        }
 
+        private void DrawSavedTab()
+        {
             Theme.Section("Saved levels");
             if (_levelFiles.Length == 0) GUILayout.Label("None yet.", Theme.Hint);
             foreach (var file in _levelFiles)
@@ -1065,10 +1108,6 @@ namespace GTWLevelEditor
                 GUILayout.EndHorizontal();
             }
             GUILayout.Label(LevelsDirectory, Theme.Hint);
-
-            EndPanelScroll();
-            DrawPanelGrip();
-            GUI.DragWindow(new Rect(0, 0, _window.width - 56, 46));
         }
 
         private void DrawSelected(LevelObject obj)

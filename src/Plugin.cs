@@ -41,6 +41,10 @@ namespace GTWLevelEditor
                 "Show only the status line in the help window.");
             editor.HidePlayerInEditor = Config.Bind("Editor", "HidePlayerInEditor", false,
                 "Hide your character while editing so it doesn't block the view (toggle in game with H).");
+            editor.ShowHelpWindow = Config.Bind("Editor", "ShowControlsWindow", true,
+                "Show the floating Controls window while editing. Close it with its × button; reopen it from the panel's Controls tab.");
+            editor.DockedLayout = Config.Bind("Editor", "DockedLayout", true,
+                "While editing: object bar in a toolbar across the top, the panel docked on the right, and the game view in the space left over.");
             editor.GridSnap = Config.Bind("Editor", "GridSnap", false,
                 "Start with grid snapping on (0.5 m steps, 15° turns). Toggle in game with G.");
             editor.UiScale = Config.Bind("Editor", "UiScale", 1f,

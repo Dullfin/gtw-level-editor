@@ -879,10 +879,22 @@ namespace GTWLevelEditor
         /// <summary>The object bar along the bottom: what each number key places. Clickable in mouse mode.</summary>
         private void DrawHotbar()
         {
-            const float bw = 106f, bh = 54f, gap = 6f;
-            float total = Hotbar.Length * bw + (Hotbar.Length - 1) * gap;
-            // Top centre: the help window and the game's own prompts use the bottom of the screen.
-            _hotbarRect = new Rect((VW - total) / 2f, 12f, total, bh);
+            const float bh = 54f, gap = 6f;
+            float bw = 106f;
+            if (Docked)
+            {
+                // Centred in the toolbar, shrinking the buttons to fit beside the panel.
+                var bar = DockToolbarRect;
+                bw = Mathf.Min(bw, (bar.width - ToolbarPad * 2f - (Hotbar.Length - 1) * gap) / Hotbar.Length);
+                float width = Hotbar.Length * bw + (Hotbar.Length - 1) * gap;
+                _hotbarRect = new Rect(bar.x + (bar.width - width) / 2f, (ToolbarHeight - bh) / 2f, width, bh);
+            }
+            else
+            {
+                float total = Hotbar.Length * bw + (Hotbar.Length - 1) * gap;
+                // Top centre: the help window and the game's own prompts use the bottom of the screen.
+                _hotbarRect = new Rect((VW - total) / 2f, 12f, total, bh);
+            }
             if (_hotbarStyle == null) _hotbarStyle = Theme.Chip;
             for (int i = 0; i < Hotbar.Length; i++)
             {

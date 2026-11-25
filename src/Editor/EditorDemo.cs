@@ -299,6 +299,7 @@ namespace GTWLevelEditor
         /// <summary>The build camera: drifts around the current piece, easing between pieces.</summary>
         private void LateUpdate()
         {
+            UpdateDockedCamera();
             if (!DemoRunning || _demoFlying) return;
             var cam = Camera.main;
             if (cam == null) return;

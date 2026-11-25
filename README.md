@@ -105,7 +105,17 @@ A selected ramp's panel has:
 | Ctrl+D | Duplicate the selection |
 | Ctrl+C / Ctrl+V | Copy / paste |
 
-The panel shows the selected object's position, rotation, size, colour, surface, launch speed and motion. It also has save, load and the level's kill height. Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift for fine changes), or type an exact number. Drag the panel's bottom-right corner to resize it; it remembers its size.
+The panel has four tabs:
+- **Object:** the selected object's position, rotation, size, colour, surface, launch speed and motion. Selecting an object switches to this tab.
+- **Level:** the level's name, Save, New, and the kill height.
+- **Saved:** your saved levels, to load.
+- **Controls:** every control, plus display options: show or hide the Controls window, the docked layout, and hiding your character.
+
+Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift for fine changes), or type an exact number.
+
+**Layout.** By default the editor uses a docked layout: the object bar sits in a toolbar across the top, the panel is fixed down the right side, and the game view fills the rest. Drag the divider between the game view and the panel to change the panel's width. Turn off **Docked layout** in the Controls tab for the floating panel instead; drag its bottom-right corner to resize it.
+
+**Controls window.** The floating Controls window shows the keys for what you're doing. Close it with its × button, and reopen it from the Controls tab.
 
 ## Objects
 
@@ -155,7 +165,9 @@ Files saved by versions before 0.4 contain no objects (an old bug lost them on s
 | `Keys/ToggleEditor` | F8 | Switch between editing and playing |
 | `Keys/TogglePanel` | Tab | Mouse mode and the panel |
 | `Editor/UiScale` | 1 | Editor UI size. The UI already scales with screen height, so it looks the same at 1080p and 4K. Raise it to make the UI bigger |
-| `Editor/PanelSize` | 440 × 640 | Size of the mouse-mode panel (drag its bottom-right corner to change it) |
+| `Editor/PanelSize` | 440 × 640 | Size of the floating panel (drag its bottom-right corner to change it). The width is also the docked panel's width (drag the divider) |
+| `Editor/DockedLayout` | true | Toolbar on top, panel docked on the right, game view in the rest. Also in the Controls tab |
+| `Editor/ShowControlsWindow` | true | Show the floating Controls window. Close it with its ×; reopen it from the Controls tab |
 | `Editor/FlyVerticalSpeed` | 8 | Fly up / down speed in m/s |
 | `Editor/GridSnap` | false | Start with grid snapping on (also G in game) |
 | `Editor/HidePlayerInEditor` | false | Hide your character while editing (also H in game, or the panel checkbox) |
