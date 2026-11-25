@@ -13,7 +13,7 @@ namespace GTWLevelEditor
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.Dullfin.GTWLevelEditor";
-        public const string Version = "0.8.0";
+        public const string Version = "0.8.1";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;

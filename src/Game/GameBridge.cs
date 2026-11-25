@@ -369,17 +369,56 @@ namespace GTWLevelEditor
                         Plugin.Log.LogInfo($"Disabled world object {root.name} in {s.name}");
                         continue;
                     }
-                    // The player's ground sphere cast also hits triggers. A huge world trigger (like the
-                    // ambience volume around the level) then counts as "ground" near the world origin and
-                    // holds the character up, so world triggers on ground layers lose their collider.
                     foreach (var col in root.GetComponentsInChildren<Collider>(true))
                     {
-                        if (!col.isTrigger || (groundMask & (1 << col.gameObject.layer)) == 0 || col.name.StartsWith("Cinemachine")) continue;
+                        if (!col.enabled || col.name.StartsWith("Cinemachine")) continue;
+                        if (col.isTrigger)
+                        {
+                            // The player's ground sphere cast also hits triggers. A huge world trigger (like the
+                            // ambience volume around the level) then counts as "ground" near the world origin and
+                            // holds the character up, so world triggers on ground layers lose their collider.
+                            if ((groundMask & (1 << col.gameObject.layer)) == 0) continue;
+                            col.enabled = false;
+                            Plugin.Log.LogInfo($"Disabled world trigger {col.name} in {s.name}");
+                            continue;
+                        }
+                        // The world is only there for its sky and lighting: any solid collider left in it
+                        // (an invisible boundary wall, say) is a barrier in the middle of the custom level.
+                        var b = col.bounds;
                         col.enabled = false;
-                        Plugin.Log.LogInfo($"Disabled world trigger {col.name} in {s.name}");
+                        Plugin.Log.LogInfo($"Disabled world collider {Path(col.transform)} in {s.name} (layer {LayerMask.LayerToName(col.gameObject.layer)}, centre {b.center}, size {b.size})");
                     }
                 }
             }
+            LogEssentialSolids(essentials);
+        }
+
+        /// <summary>
+        /// For tracking down barriers: solid colliders in the player's own scene that the player can
+        /// hit, away from the player itself. They're only logged, since the player needs that scene.
+        /// </summary>
+        private static void LogEssentialSolids(Scene essentials)
+        {
+            if (!essentials.IsValid() || Player == null) return;
+            int playerLayer = Player.gameObject.layer;
+            var playerRoot = Player.transform.root;
+            foreach (var root in essentials.GetRootGameObjects())
+            {
+                if (root.transform == playerRoot) continue;
+                foreach (var col in root.GetComponentsInChildren<Collider>(false))
+                {
+                    if (!col.enabled || col.isTrigger || Physics.GetIgnoreLayerCollision(playerLayer, col.gameObject.layer)) continue;
+                    var b = col.bounds;
+                    Plugin.Log.LogInfo($"Solid collider left in {essentials.name}: {Path(col.transform)} (layer {LayerMask.LayerToName(col.gameObject.layer)}, centre {b.center}, size {b.size})");
+                }
+            }
+        }
+
+        private static string Path(Transform t)
+        {
+            var name = t.name;
+            for (var p = t.parent; p != null; p = p.parent) name = p.name + "/" + name;
+            return name;
         }
 
         /// <summary>Forget everything when the level the player was in goes away.</summary>
