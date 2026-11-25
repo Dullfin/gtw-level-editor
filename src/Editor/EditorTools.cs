@@ -41,19 +41,19 @@ namespace GTWLevelEditor
         private void HandleShortcuts()
         {
             if (!Ctrl) return;
-            if (Input.GetKeyDown(KeyCode.Z)) { if (Shift) Redo(); else Undo(); }
-            else if (Input.GetKeyDown(KeyCode.Y)) Redo();
-            else if (Input.GetKeyDown(KeyCode.C))
+            if (EditorKeys.Down(EditorAction.Undo)) { if (Shift) Redo(); else Undo(); }
+            else if (EditorKeys.Down(EditorAction.Redo)) Redo();
+            else if (EditorKeys.Down(EditorAction.Copy))
             {
                 var src = _cursorMode ? _selected : (AimedObject() ?? _selected);
                 if (src != null) { _clipboard = src.Data.Clone(); Toast("Copied " + src.Kind); }
             }
-            else if (Input.GetKeyDown(KeyCode.V) && _clipboard != null)
+            else if (EditorKeys.Down(EditorAction.Paste) && _clipboard != null)
             {
                 if (_cursorMode) AddCopy(_clipboard);
                 else HoldCopy(_clipboard);
             }
-            else if (Input.GetKeyDown(KeyCode.D))
+            else if (EditorKeys.Down(EditorAction.Duplicate))
             {
                 if (_cursorMode) DuplicateSelected();
                 else
@@ -192,7 +192,7 @@ namespace GTWLevelEditor
         // ---------------- mouse mode: handles ----------------
 
         private enum GizmoMode { Move, Rotate, Scale }
-        private enum DragKind { None, MoveAxis, MovePlane, Rotate, ScaleAxis, ScaleUniform, RampPoint, Look, PointAxis, PointPlane, PointBank, PointWidth }
+        private enum DragKind { None, MoveAxis, MovePlane, Rotate, ScaleAxis, ScaleUniform, RampPoint, Look, PointAxis, PointPlane, PointBank, PointWidth, WedgeCurve }
 
         private GizmoMode _gizmo = GizmoMode.Move;
         private DragKind _drag;
@@ -220,10 +220,10 @@ namespace GTWLevelEditor
             bool flying = Input.GetMouseButton(1);
             if (!typing && !flying)
             {
-                if (!Ctrl && Input.GetKeyDown(KeyCode.W)) _gizmo = GizmoMode.Move;
-                if (!Ctrl && Input.GetKeyDown(KeyCode.E)) _gizmo = GizmoMode.Rotate;
-                if (!Ctrl && Input.GetKeyDown(KeyCode.R)) _gizmo = GizmoMode.Scale;
-                if (Input.GetKeyDown(KeyCode.Delete) && _selected != null)
+                if (!Ctrl && EditorKeys.Down(EditorAction.HandlesMove)) _gizmo = GizmoMode.Move;
+                if (!Ctrl && EditorKeys.Down(EditorAction.HandlesRotate)) _gizmo = GizmoMode.Rotate;
+                if (!Ctrl && EditorKeys.Down(EditorAction.HandlesScale)) _gizmo = GizmoMode.Scale;
+                if (EditorKeys.Down(EditorAction.DeleteSelected) && _selected != null)
                 {
                     if (_selected.IsRamp && _selectedPoint >= 0 && _selected.Data.points.Count > 2)
                     {
@@ -390,6 +390,11 @@ namespace GTWLevelEditor
                 case GizmoMode.Scale:
                 {
                     if (_selected.IsRamp) return; // ramps are shaped by their points
+                    if (IsWedge)
+                    {
+                        var wc = ToGui(cam, WedgeCurveHandle(cam), out var wv);
+                        if (wv && Vector2.Distance(wc, mouse) < HandlePick * 1.1f) { _hoverKind = DragKind.WedgeCurve; _hoverAxis = 0; return; }
+                    }
                     if (Vector2.Distance(c, mouse) < HandlePick) { _hoverKind = DragKind.ScaleUniform; return; }
                     for (int i = 0; i < 3; i++)
                     {
@@ -510,6 +515,12 @@ namespace GTWLevelEditor
                     _dragStartValue = _selected.Data.points[_selectedPoint].width;
                     _dragStartT = ClosestOnAxis(ray, _dragStartPos, _dragAxisVec) ?? 1f;
                     if (Mathf.Abs(_dragStartT) < 0.05f) _dragStartT = 0.05f;
+                    break;
+                case DragKind.WedgeCurve:
+                    _dragStartPos = WedgeCurveHandle(cam);
+                    _dragAxisVec = WedgeCurveAxis();
+                    _dragStartValue = Mathf.Clamp(_selected.Data.slopeCurve, -1f, 1f);
+                    _dragStartT = ClosestOnAxis(ray, _dragStartPos, _dragAxisVec.normalized) ?? 0f;
                     break;
                 case DragKind.RampPoint:
                 {
@@ -685,8 +696,61 @@ namespace GTWLevelEditor
                     d.points[_selectedPoint].width = Mathf.Clamp(w, 0.2f, 60f);
                     break;
                 }
+                case DragKind.WedgeCurve:
+                {
+                    if (!IsWedge) return;
+                    float len = _dragAxisVec.magnitude;
+                    if (len < 1e-4f) return;
+                    var t = ClosestOnAxis(ray, _dragStartPos, _dragAxisVec / len);
+                    if (t == null || Mathf.Abs(t.Value - _dragStartT) > 1000f) return;
+                    float curve = Mathf.Clamp(_dragStartValue + (t.Value - _dragStartT) / len, -1f, 1f);
+                    if (_snap) curve = Mathf.Round(curve * 10f) / 10f;
+                    d.slopeCurve = Mathf.Abs(curve) < 0.02f ? 0f : curve;
+                    break;
+                }
             }
             _selected.Refresh();
+        }
+
+        // ---------------- wedge slope curve handle ----------------
+
+        private bool IsWedge => _selected != null && _selected.Data.Kind == ObjectKind.Wedge;
+
+        /// <summary>The wedge side facing the camera (local x of ±0.5), where the curve handle and outline go.</summary>
+        private float WedgeSide(Camera cam)
+        {
+            var toCam = cam.transform.position - _selected.transform.position;
+            return Vector3.Dot(toCam, _selected.transform.right) >= 0f ? 0.5f : -0.5f;
+        }
+
+        /// <summary>The middle of the slope's edge on the camera's side: dragging it bends the slope.</summary>
+        private Vector3 WedgeCurveHandle(Camera cam) =>
+            _selected.transform.TransformPoint(LevelObject.WedgeSlopePoint(_selected.Data.slopeCurve, 0.5f, WedgeSide(cam)));
+
+        /// <summary>How far (world) the handle moves for a curve change of 1: up the back and out the front, so out = convex.</summary>
+        private Vector3 WedgeCurveAxis() => _selected.transform.TransformVector(new Vector3(0f, 0.25f, -0.25f));
+
+        private void DrawWedgeCurveHandle(Camera cam, float ui)
+        {
+            float side = WedgeSide(cam);
+            float curve = _selected.Data.slopeCurve;
+            bool hot = _drag == DragKind.WedgeCurve || (_drag == DragKind.None && _hoverKind == DragKind.WedgeCurve);
+            var col = hot ? new Color(1f, 0.92f, 0.2f) : new Color(1f, 0.4f, 0.85f);
+            // The slope's outline on that side, and the straight line it bends away from.
+            Vector2 prev = default;
+            bool prevVis = false;
+            for (int k = 0; k <= 16; k++)
+            {
+                var g = ToGui(cam, _selected.transform.TransformPoint(LevelObject.WedgeSlopePoint(curve, k / 16f, side)), out var v);
+                if (k > 0 && v && prevVis) Line(prev, g, new Color(col.r, col.g, col.b, 0.8f), 2.5f * ui);
+                prev = g;
+                prevVis = v;
+            }
+            var a = ToGui(cam, _selected.transform.TransformPoint(new Vector3(side, -0.5f, -0.5f)), out var av);
+            var b = ToGui(cam, _selected.transform.TransformPoint(new Vector3(side, 0.5f, 0.5f)), out var bv);
+            if (av && bv && Mathf.Abs(curve) > 0.005f) Line(a, b, new Color(1f, 1f, 1f, 0.25f), 1.5f * ui);
+            var h = ToGui(cam, WedgeCurveHandle(cam), out var hv);
+            if (hv) Dot(h, 16f * ui, col);
         }
 
         // ---------------- drawing (screen pixels, on top of the world) ----------------
@@ -781,6 +845,7 @@ namespace GTWLevelEditor
                         break;
                     case GizmoMode.Scale:
                         if (_selected.IsRamp) break;
+                        if (IsWedge) DrawWedgeCurveHandle(cam, ui);
                         for (int i = 0; i < 3; i++)
                         {
                             var e = ToGui(cam, center + GizmoAxis(i) * len, out var v);

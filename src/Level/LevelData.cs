@@ -147,6 +147,10 @@ namespace GTWLevelEditor
         /// <summary>Jump pad surface: how far above the top (m) the launch zone reaches, so you bounce before touching it. 0 = on contact only.</summary>
         public float padHeight = 0.6f;
 
+        // ---- wedges only ----
+        /// <summary>-1 to 1: how the slope bends. Negative curves it in (concave, like a quarter pipe), positive curves it out (a rounded hill), 0 is straight.</summary>
+        public float slopeCurve;
+
         // ---- slippery surfaces: how much of the main game's grip is kept (0-1) ----
         public float iceFriction;
         public float iceSteering = 1f;

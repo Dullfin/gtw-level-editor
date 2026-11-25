@@ -300,6 +300,7 @@ namespace GTWLevelEditor
         private void LateUpdate()
         {
             UpdateDockedCamera();
+            UpdateGameTimer();
             if (!DemoRunning || _demoFlying) return;
             var cam = Camera.main;
             if (cam == null) return;

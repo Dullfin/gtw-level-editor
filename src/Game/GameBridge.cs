@@ -328,11 +328,12 @@ namespace GTWLevelEditor
 
         // ---------- Doinkler UI and level start ----------
 
-        /// <summary>Hides the game's own Doinkler level timer while a custom level runs; ours replaces it.</summary>
+        /// <summary>
+        /// Hides the game's simple Doinkler level timer while a custom level runs. The speedrun timer
+        /// panel stays: it shows our level's time instead (see GameTimer).
+        /// </summary>
         public static void HideGameTimers()
         {
-            foreach (var t in Object.FindObjectsByType<Isto.GTW.Speedrun.DoinklerSpeedrunTimer>(FindObjectsSortMode.None))
-                HideUi(t.gameObject);
             foreach (var t in Object.FindObjectsByType<Isto.GTW.UI.UIDoinklerTimer>(FindObjectsSortMode.None))
                 HideUi(t.gameObject);
         }

@@ -12,7 +12,6 @@ namespace GTWLevelEditor
     {
         public ConfigEntry<bool> HidePlayerInEditor;
         public ConfigEntry<bool> GridSnap;
-        public static KeyCode HidePlayerKey = KeyCode.H;
 
         private readonly List<Renderer> _playerRenderers = new List<Renderer>();
         private Isto.GTW.Player.PlayerController _renderersOf;
@@ -89,13 +88,13 @@ namespace GTWLevelEditor
         private void FlyMouseModeCamera(Camera cam)
         {
             var move = Vector3.zero;
-            if (Input.GetKey(KeyCode.W)) move += Vector3.forward;
-            if (Input.GetKey(KeyCode.S)) move += Vector3.back;
-            if (Input.GetKey(KeyCode.D)) move += Vector3.right;
-            if (Input.GetKey(KeyCode.A)) move += Vector3.left;
-            float up = (Input.GetKey(KeyCode.E) || Input.GetKey(KeyCode.Space) ? 1f : 0f) - (Input.GetKey(KeyCode.Q) ? 1f : 0f);
+            if (EditorKeys.Held(EditorAction.CameraForward)) move += Vector3.forward;
+            if (EditorKeys.Held(EditorAction.CameraBack)) move += Vector3.back;
+            if (EditorKeys.Held(EditorAction.CameraRight)) move += Vector3.right;
+            if (EditorKeys.Held(EditorAction.CameraLeft)) move += Vector3.left;
+            float up = (EditorKeys.Held(EditorAction.CameraUp) ? 1f : 0f) - (EditorKeys.Held(EditorAction.CameraDown) ? 1f : 0f);
             if (move == Vector3.zero && up == 0f) return;
-            float speed = 14f * (Shift ? 3f : 1f) * Time.unscaledDeltaTime;
+            float speed = 14f * (EditorKeys.Held(EditorAction.Fast) ? 3f : 1f) * Time.unscaledDeltaTime;
             cam.transform.position += (cam.transform.rotation * move.normalized + Vector3.up * up) * speed;
         }
     }

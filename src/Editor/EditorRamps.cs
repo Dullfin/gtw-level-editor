@@ -61,9 +61,9 @@ namespace GTWLevelEditor
                 else _draftHeight = Mathf.Clamp(_draftHeight + step, -50f, 100f);
             }
             float bankStep = fast ? 15f : 5f;
-            if (Input.GetKeyDown(KeyCode.Q)) _draftBank = Mathf.Clamp(_draftBank - bankStep, -90f, 90f);
-            if (Input.GetKeyDown(KeyCode.E)) _draftBank = Mathf.Clamp(_draftBank + bankStep, -90f, 90f);
-            if (Input.GetKeyDown(KeyCode.T)) { _draftHeight = 0f; _draftBank = 0f; _draftReach = 0f; }
+            if (EditorKeys.Down(EditorAction.BankLeft)) _draftBank = Mathf.Clamp(_draftBank - bankStep, -90f, 90f);
+            if (EditorKeys.Down(EditorAction.BankRight)) _draftBank = Mathf.Clamp(_draftBank + bankStep, -90f, 90f);
+            if (EditorKeys.Down(EditorAction.ResetRampPoint)) { _draftHeight = 0f; _draftBank = 0f; _draftReach = 0f; }
 
             // ---- add / remove / finish ----
             if (Input.GetMouseButtonDown(0))
@@ -88,8 +88,8 @@ namespace GTWLevelEditor
                     _draft.Add(new RampPoint { position = _draftCursor, width = _draftWidth, bank = _draftBank });
                 }
             }
-            if (Input.GetKeyDown(KeyCode.Backspace) && _draft.Count > 0) _draft.RemoveAt(_draft.Count - 1);
-            if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && _draft.Count >= 2)
+            if (EditorKeys.Down(EditorAction.RemoveRampPoint) && _draft.Count > 0) _draft.RemoveAt(_draft.Count - 1);
+            if (EditorKeys.Down(EditorAction.FinishRamp) && _draft.Count >= 2)
             {
                 FinishRamp();
                 return;

@@ -164,6 +164,12 @@ namespace GTWLevelEditor
                 return;
             }
 
+            RunPausePickerLoad();
+            // The game's Esc menu stops time: its clicks and keys are for the menu, not the editor.
+            if (Time.timeScale <= 0f) return;
+            // Waiting for a new key binding: the key pressed is for that, not the editor.
+            if (CaptureRebindKey()) return;
+
             if (ToggleEditorKey.Value.IsDown())
             {
                 if (IsEditing) ExitEditor(); else EnterEditor();
@@ -219,7 +225,7 @@ namespace GTWLevelEditor
             GameBridge.DisableWorldHazards();
             GameBridge.HideGameTimers();
             ApplyLevel(CustomSession.Level ?? LevelData.CreateNew(CustomSession.Environment));
-            _bestTime = -1f;
+            _bestTime = PersonalBests.Get(_level.name);
             if (CustomSession.StartInEditor)
             {
                 MovePlayerToStart();
@@ -284,7 +290,7 @@ namespace GTWLevelEditor
             if (CursorModeKey.Value.IsDown()) SetCursorMode(!_cursorMode);
             bool typing = GUIUtility.keyboardControl != 0;
             if (!typing) HandleShortcuts();
-            if (!typing && !Ctrl && Input.GetKeyDown(HidePlayerKey)) TogglePlayerHidden();
+            if (!typing && !Ctrl && EditorKeys.Down(EditorAction.HidePlayer)) TogglePlayerHidden();
 
             if (_cursorMode)
             {
@@ -296,8 +302,8 @@ namespace GTWLevelEditor
             }
 
             // ---- flying ----
-            float vertical = (Input.GetKey(KeyCode.Space) ? 1f : 0f) - (Input.GetKey(KeyCode.LeftAlt) ? 1f : 0f);
-            bool fast = Input.GetKey(KeyCode.LeftShift);
+            float vertical = (EditorKeys.Held(EditorAction.FlyUp) ? 1f : 0f) - (EditorKeys.Held(EditorAction.FlyDown) ? 1f : 0f);
+            bool fast = EditorKeys.Held(EditorAction.Fast);
             p.noClipHighSpeedMode = fast;
             if (vertical != 0f)
             {
@@ -310,7 +316,7 @@ namespace GTWLevelEditor
                 if (Input.GetKeyDown(HotbarKeys[i]) && !Ctrl && Shift == HotbarNeedsShift(i)) SetKind(Hotbar[i]);
             }
 
-            if (Input.GetKeyDown(KeyCode.G) && !Ctrl) SetSnap(!_snap);
+            if (EditorKeys.Down(EditorAction.Snap) && !Ctrl) SetSnap(!_snap);
 
             if (_rampTool)
             {
@@ -321,18 +327,18 @@ namespace GTWLevelEditor
             if (_ghost == null) SpawnGhost(LevelObjectData.CreateDefault(_kind));
 
             // ---- rotate / scale the ghost ----
-            if (Input.GetKeyDown(KeyCode.Q)) _ghostEuler.y -= 15f;
-            if (Input.GetKeyDown(KeyCode.E)) _ghostEuler.y += 15f;
-            if (Input.GetKeyDown(KeyCode.R)) _ghostEuler.x -= 15f;
-            if (Input.GetKeyDown(KeyCode.F)) _ghostEuler.x += 15f;
-            if (Input.GetKeyDown(KeyCode.T))
+            if (EditorKeys.Down(EditorAction.TurnLeft)) _ghostEuler.y -= 15f;
+            if (EditorKeys.Down(EditorAction.TurnRight)) _ghostEuler.y += 15f;
+            if (EditorKeys.Down(EditorAction.TiltBack)) _ghostEuler.x -= 15f;
+            if (EditorKeys.Down(EditorAction.TiltForward)) _ghostEuler.x += 15f;
+            if (EditorKeys.Down(EditorAction.ResetTurn))
             {
                 _ghostEuler = LevelObjectData.CreateDefault(_kind).rotation; // launchers start tilted
                 _ghostReach = 0f;
             }
 
             // ---- launch speed: the aimed-at jump pad/bumper if there is one, otherwise the one being placed ----
-            bool lower = Input.GetKeyDown(KeyCode.LeftBracket), raise = Input.GetKeyDown(KeyCode.RightBracket);
+            bool lower = EditorKeys.Down(EditorAction.LaunchSlower), raise = EditorKeys.Down(EditorAction.LaunchFaster);
             if (lower || raise)
             {
                 var aimed = AimedObject();
@@ -371,7 +377,7 @@ namespace GTWLevelEditor
                 var aimed = AimedObject();
                 if (aimed != null) PickUp(aimed);
             }
-            if (Input.GetKeyDown(KeyCode.Delete) || Input.GetKeyDown(KeyCode.Backspace))
+            if (EditorKeys.Down(EditorAction.DeleteAimed))
             {
                 var aimed = AimedObject();
                 if (aimed != null) DeleteObject(aimed);
@@ -585,6 +591,7 @@ namespace GTWLevelEditor
         private void ResetTimer()
         {
             _runTime = 0f;
+            _runFinished = false;
             _timerRunning = _objects.Count > 0;
             _motionStart = Time.fixedTime; // moving pieces start from their placed pose on every (re)start
         }
@@ -630,8 +637,13 @@ namespace GTWLevelEditor
         {
             if (!_timerRunning) return;
             _timerRunning = false;
+            _runFinished = true;
             bool best = _bestTime < 0f || _runTime < _bestTime;
-            if (best) _bestTime = _runTime;
+            if (best)
+            {
+                _bestTime = _runTime;
+                PersonalBests.Set(_level.name, _runTime);
+            }
             LastFinishTime = _runTime;
             Toast($"Finished in {FormatTime(_runTime)}" + (best ? "  (best!)" : $"  (best {FormatTime(_bestTime)})"), 6f);
         }
@@ -640,10 +652,10 @@ namespace GTWLevelEditor
         public bool TryRestartFromStart()
         {
             if (IsEditing) return false;
+            ResetTimer(); // a restart starts a new run, with or without a Start pad
             var start = StartObject;
             if (start == null) return false;
             GameBridge.RespawnAt(start.AsCheckpoint());
-            ResetTimer();
             return true;
         }
 
@@ -694,7 +706,7 @@ namespace GTWLevelEditor
                 var data = ReadLevel(name);
                 ApplyLevel(data);
                 ClearUndo();
-                _bestTime = -1f;
+                _bestTime = PersonalBests.Get(_level.name);
                 string note = data.environment != CustomSession.Environment
                     ? $" (made in World {data.environment + 1}, opened in World {CustomSession.Environment + 1})" : "";
                 Toast($"Loaded {name}: {_objects.Count} objects{note}", 4f);
@@ -819,10 +831,13 @@ namespace GTWLevelEditor
                     Theme.ShadowLabel(new Rect(c.x - 15, c.y - 18, 30, 36), "+", _bigStyle);
                 }
             }
-            else if (_objects.Count > 0)
+            else if (_objects.Count > 0 && !GameTimerVisible)
             {
+                // Only when the game's own timer panel is switched off in its settings.
                 Theme.ShadowLabel(new Rect(VW / 2f - 150, 20, 300, 44), FormatTime(_runTime), _bigStyle);
             }
+
+            DrawPausePicker();
 
             if (_message != null && Time.unscaledTime < _messageUntil)
             {
@@ -888,24 +903,29 @@ namespace GTWLevelEditor
             if (_cursorMode) GUI.DragWindow();
         }
 
+        /// <summary>The key(s) bound to an editor action, as a key cap.</summary>
+        private static string B(EditorAction a) => K(EditorKeys.Name(a));
+        private static string BC(EditorAction a) => K("Ctrl+" + EditorKeys.Name(a));
+        private static string Fast => EditorKeys.Name(EditorAction.Fast);
+
         private static string MouseModeControls(string gap) =>
-            $"{K("Click")} select an object, then drag its handles{gap}{K("W")} move (yellow square: along the ground){gap}{K("E")} rotate{gap}{K("R")} scale" +
-            $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down); a chosen point gets handles: {K("W")} move, {K("E")} bank, {K("R")} width. Click the ramp itself for whole-ramp handles" +
-            $"\n{K("Delete")} removes the chosen point or object" +
-            $"\n{K("Hold right mouse")} look around, with {K("W")}{K("A")}{K("S")}{K("D")} to fly, {K("Q")} / {K("E")} down / up{gap}{K("Wheel")} move forward / back{gap}{K("H")} hide player" +
-            $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} duplicate{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
+            $"{K("Click")} select an object, then drag its handles{gap}{B(EditorAction.HandlesMove)} move (yellow square: along the ground){gap}{B(EditorAction.HandlesRotate)} rotate{gap}{B(EditorAction.HandlesScale)} scale" +
+            $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down); a chosen point gets handles: {B(EditorAction.HandlesMove)} move, {B(EditorAction.HandlesRotate)} bank, {B(EditorAction.HandlesScale)} width. Click the ramp itself for whole-ramp handles" +
+            $"\n{B(EditorAction.DeleteSelected)} removes the chosen point or object" +
+            $"\n{K("Hold right mouse")} look around, with {B(EditorAction.CameraForward)}{B(EditorAction.CameraLeft)}{B(EditorAction.CameraBack)}{B(EditorAction.CameraRight)} to fly, {B(EditorAction.CameraDown)} / {B(EditorAction.CameraUp)} down / up{gap}{K("Wheel")} move forward / back{gap}{B(EditorAction.HidePlayer)} hide player" +
+            $"\n{BC(EditorAction.Undo)} undo{gap}{BC(EditorAction.Redo)} redo{gap}{BC(EditorAction.Duplicate)} duplicate{gap}{BC(EditorAction.Copy)} / {BC(EditorAction.Paste)} copy / paste";
 
         private static string RampControls(string gap) =>
             $"{K("Click")} add a point; the ramp curves smoothly through them. Start on another ramp's end to join it." +
-            $"\n{K("Wheel")} height of the next point{gap}{K("Shift+Wheel")} width{gap}{K("Q")} / {K("E")} bank{gap}{K("T")} reset{gap}{K("Ctrl+Wheel")} pull the point closer / push it away" +
-            $"\n{K("Backspace")} remove the last point{gap}{K("Enter")} or click the last point again: finish" +
-            $"\n{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast{gap}{K("G")} grid snap{gap}{K("Tab")} afterwards to fine-tune the points";
+            $"\n{K("Wheel")} height of the next point{gap}{K(Fast + "+Wheel")} width{gap}{B(EditorAction.BankLeft)} / {B(EditorAction.BankRight)} bank{gap}{B(EditorAction.ResetRampPoint)} reset{gap}{K("Ctrl+Wheel")} pull the point closer / push it away" +
+            $"\n{B(EditorAction.RemoveRampPoint)} remove the last point{gap}{B(EditorAction.FinishRamp)} or click the last point again: finish" +
+            $"\n{B(EditorAction.FlyUp)} / {B(EditorAction.FlyDown)} fly up / down{gap}{K(Fast)} fast{gap}{B(EditorAction.Snap)} grid snap{gap}{K(Instance != null ? Instance.CursorModeKey.Value.ToString() : "Tab")} afterwards to fine-tune the points";
 
         private static string PlacingControls(string gap) =>
-            $"{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{K("Space")} / {K("Alt")} fly up / down{gap}{K("Shift")} fast" +
-            $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{K("Delete")} delete{gap}{K("Q")} / {K("E")} turn{gap}{K("R")} / {K("F")} tilt{gap}{K("T")} reset{gap}{K("G")} snap" +
-            $"\n{K("Wheel")} size{gap}{K("Shift+Wheel")} height{gap}{K("Ctrl+Wheel")} pull closer / push away{gap}{K("[")} / {K("]")} launch speed{gap}{K("H")} hide player" +
-            $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} pick up a copy of the aimed object{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
+            $"{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{B(EditorAction.FlyUp)} / {B(EditorAction.FlyDown)} fly up / down{gap}{K(Fast)} fast" +
+            $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{B(EditorAction.DeleteAimed)} delete{gap}{B(EditorAction.TurnLeft)} / {B(EditorAction.TurnRight)} turn{gap}{B(EditorAction.TiltBack)} / {B(EditorAction.TiltForward)} tilt{gap}{B(EditorAction.ResetTurn)} reset{gap}{B(EditorAction.Snap)} snap" +
+            $"\n{K("Wheel")} size{gap}{K(Fast + "+Wheel")} height{gap}{K("Ctrl+Wheel")} pull closer / push away{gap}{B(EditorAction.LaunchSlower)} / {B(EditorAction.LaunchFaster)} launch speed{gap}{B(EditorAction.HidePlayer)} hide player" +
+            $"\n{BC(EditorAction.Undo)} undo{gap}{BC(EditorAction.Redo)} redo{gap}{BC(EditorAction.Duplicate)} pick up a copy of the aimed object{gap}{BC(EditorAction.Copy)} / {BC(EditorAction.Paste)} copy / paste";
 
         // ---------------- title screen menu ----------------
 
@@ -1133,6 +1153,18 @@ namespace GTWLevelEditor
                     d.cutsPlatforms = GUILayout.Toggle(d.cutsPlatforms, "Cut through platforms (a hole where it passes through one)");
                     GUILayout.Label("Size X / Z set the outside diameter and Y the length. Turn it with Rotation to lie it on its side.", Theme.Hint);
                 }
+            }
+            if (d.Kind == ObjectKind.Wedge)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label("Slope curve", GUILayout.Width(110));
+                float curve = GUILayout.HorizontalSlider(Mathf.Clamp(d.slopeCurve, -1f, 1f), -1f, 1f, GUILayout.ExpandWidth(true));
+                curve = Mathf.Round(curve * 20f) / 20f;
+                GUILayout.Label(curve < 0f ? $"in {-curve * 100f:0}%" : curve > 0f ? $"out {curve * 100f:0}%" : "straight", GUILayout.Width(80));
+                if (GUILayout.Button("Reset", Theme.GhostButton, GUILayout.Width(64))) curve = 0f;
+                GUILayout.EndHorizontal();
+                d.slopeCurve = curve;
+                GUILayout.Label("Bend the slope in (a smooth run-up, like a quarter pipe) or out (a rounded hill). With Scale handles (R), drag the pink handle on the slope's edge.", Theme.Hint);
             }
             if (d.HasForce) d.force = Mathf.Max(0f, FloatField("Launch m/s", "force", d.force, 1f));
             if (d.Kind == ObjectKind.Launcher || d.Kind == ObjectKind.WallLauncher)

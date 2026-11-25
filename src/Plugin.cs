@@ -13,7 +13,7 @@ namespace GTWLevelEditor
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.Dullfin.GTWLevelEditor";
-        public const string Version = "0.7.0";
+        public const string Version = "0.8.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -31,6 +31,7 @@ namespace GTWLevelEditor
                 "Switch between editing and playing the level.");
             editor.CursorModeKey = Config.Bind("Keys", "TogglePanel", new KeyboardShortcut(KeyCode.Tab),
                 "While editing: show the mouse cursor and the save/load/properties panel.");
+            EditorKeys.Bind(Config);
             editor.FlyVerticalSpeed = Config.Bind("Editor", "FlyVerticalSpeed", 8f,
                 "Speed in m/s when flying up (Space) or down (Left Alt) in the editor.");
             editor.PanelSize = Config.Bind("Editor", "PanelSize", new Vector2(440f, 640f),

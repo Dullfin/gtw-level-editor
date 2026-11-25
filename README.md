@@ -34,6 +34,8 @@ You need Get To Work with [BepInEx 5](https://github.com/BepInEx/BepInEx) instal
 4. Press **F8** to play: you spawn on the Start pad and the timer starts. Press **F8** again to go back to editing.
 5. Leave from the pause menu by quitting to the title screen.
 
+In play mode, the game's own timer panel shows the level's name, the run time and a single **Personal Best** row underneath (in place of the game's File 1–6 rows). The time turns green when you reach the Finish. The game's Restart key starts a new run: back to the Start pad with the timer at zero. Personal bests are kept per level name in `BepInEx\LevelEditor\PersonalBests.json`. The panel follows the game's own timer settings; if you've switched the timer off there, a plain timer shows at the top of the screen instead.
+
 The editor has two modes:
 - **Flying** (the default) is for building: fly around and place things at the crosshair.
 - **Mouse mode** (**Tab**) shows the cursor and the side panel. Use it for fine-tuning: select objects, drag their handles and edit exact values. Hold right mouse and use WASD to fly the camera around. When you leave mouse mode, you carry on flying from where the camera ended up.
@@ -41,6 +43,8 @@ The editor has two modes:
 The bar at the top of the screen shows what each number key places. In mouse mode you can click it.
 
 ## Controls
+
+These are the default keys. To change them, open the panel's **Controls** tab and click a key, then press the new one (Esc cancels). Each action can have two keys; **+** adds a second one and **×** clears it. A warning shows when two actions that work at the same time share a key, and **Reset all keys** puts the defaults back. The Controls window always shows your current keys. Ctrl shortcuts keep Ctrl, and the number keys always choose objects.
 
 ### Flying
 
@@ -125,6 +129,7 @@ Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift 
   - **Sticky:** grab it to stick on, even upside down.
   - **Jump pad:** throws you off at the launch speed, so any platform, cylinder, sphere, wedge or ramp can be a jump pad. Tilt it to aim. Platforms, cylinders and spheres have a **Launch zone** slider (0–3 m, 0.6 m by default): an orange box above the top that throws you before you touch the surface. Wedges and ramps, or a zone set to "off", bounce you on contact.
 - **Hollow cylinder:** tick **Hollow** on a selected cylinder to make it an open tube you can roll through, and set its wall thickness. Size X / Z set the outside diameter and Y the length; rotate it to lie it on its side. Tick **Cut through platforms** under it and the tube cuts a hole in any platform it passes straight through, so you can roll through the tube. The tube has to run along one of the platform's axes, and its opening has to fit inside the platform.
+- **Curved wedge:** a selected wedge's **Slope curve** bends its slope in (concave: a smooth run-up, like a quarter pipe) or out (convex: a rounded hill). With the Scale handles (R), drag the pink handle on the slope's edge, or use the slider in the panel. Size Y and Z still set the height and length.
 - **Launcher:** the game's slingshot. Roll onto the orange carriage and hold Grab. It locks you on, shoots along its arrow and throws you at its launch speed. Tilt it with Rotation X. The panel sets the travel and launch speed, and a yellow line previews the path while editing.
 - **Wall launcher:** the same slingshot mounted on a wall.
 - **Cog launcher:** the game's giant spinning cog. Grab it to ride it, and let go to fly off with its speed. Negative spin turns it the other way.
@@ -154,6 +159,11 @@ Levels are saved as JSON in `Get To Work\BepInEx\LevelEditor\Levels\`, one file 
 - **Delete** (on a level's row, then confirm) moves the level file to the Windows Recycle Bin, so you can still restore it.
 - **Open levels folder** opens the folder in Explorer.
 
+Inside a custom level, the game's Esc menu has two buttons of its own:
+
+- **Save level** (in place of Save Splits) saves the level you have open, the same as Save in the editor panel.
+- **Level select** lists your saved levels. **Play** or **Edit** closes the menu and opens that level in the current world. Save first: loading another level replaces the one you have open.
+
 Files saved by versions before 0.4 contain no objects (an old bug lost them on save), so they open as empty levels.
 
 ## Settings
@@ -164,6 +174,7 @@ Files saved by versions before 0.4 contain no objects (an old bug lost them on s
 |---|---|---|
 | `Keys/ToggleEditor` | F8 | Switch between editing and playing |
 | `Keys/TogglePanel` | Tab | Mouse mode and the panel |
+| `Keys/<action>` | see Controls | Every other editor key (`Snap`, `TurnLeft`, `CameraUp`…): one or two Unity key names separated by a comma, e.g. `Delete, Backspace` |
 | `Editor/UiScale` | 1 | Editor UI size. The UI already scales with screen height, so it looks the same at 1080p and 4K. Raise it to make the UI bigger |
 | `Editor/PanelSize` | 440 × 640 | Size of the floating panel (drag its bottom-right corner to change it). The width is also the docked panel's width (drag the divider) |
 | `Editor/DockedLayout` | true | Toolbar on top, panel docked on the right, game view in the rest. Also in the Controls tab |
@@ -192,7 +203,7 @@ Close the game before building, or the copy fails because the DLL is in use.
 | Folder | What's in it |
 |---|---|
 | `src/Plugin.cs` | The BepInEx entry point: settings and Harmony patches |
-| `src/Game/` | Hooks into the game: loading an empty Doinkler world, the player and camera, blocking saves, ice physics |
+| `src/Game/` | Hooks into the game: loading an empty Doinkler world, the player and camera, blocking saves, slippery physics, the Esc menu's Save level and Level select |
 | `src/Level/` | The level data and its JSON format |
 | `src/Objects/` | Placed objects in the world: shapes, ramps, launchers, moving pieces, hollow tubes and the holes they cut |
 | `src/Editor/` | The editor itself: placing, handles, ramp drawing, motion, the panel, theme and the scripted demo |

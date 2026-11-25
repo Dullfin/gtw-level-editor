@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Isto.GTW.LevelFeatures;
 using UnityEngine;
 
@@ -186,6 +187,7 @@ namespace GTWLevelEditor
             ApplyTransform();
             if (_rampMesh != null) RefreshRamp();
             if (Data.Kind == ObjectKind.Cylinder) RefreshHollow();
+            if (Data.Kind == ObjectKind.Wedge) RefreshWedgeCurve();
             if (_material != null) GameBridge.SetColor(_material, _isGhost ? Ghostly(Data.color) : Data.color);
             if (_solid != null)
             {
@@ -345,6 +347,108 @@ namespace GTWLevelEditor
             if (_rampMesh != null) Destroy(_rampMesh);
             if (_hollowMesh != null) Destroy(_hollowMesh);
             if (_cutMesh != null) Destroy(_cutMesh);
+            if (_curvedWedgeMesh != null) Destroy(_curvedWedgeMesh);
+        }
+
+        // ---------------- curved wedge slopes ----------------
+
+        private const int WedgeCurveSteps = 16;
+        private Mesh _curvedWedgeMesh;
+        private float _wedgeCurveBuilt;
+
+        /// <summary>
+        /// A point on the wedge's slope profile in local space: <paramref name="s"/> runs 0 (front, at
+        /// the bottom) to 1 (back, at the top) along a curve bent by <paramref name="curve"/> (-1 to 1),
+        /// at side <paramref name="x"/> (-0.5 to 0.5).
+        /// </summary>
+        public static Vector3 WedgeSlopePoint(float curve, float s, float x)
+        {
+            // A quadratic curve from (0,0) to (1,1) whose middle control point slides from (1,0)
+            // (curved in) through (0.5,0.5) (straight) to (0,1) (curved out).
+            float c = Mathf.Clamp(curve, -1f, 1f);
+            var p = new Vector2(0.5f - 0.5f * c, 0.5f + 0.5f * c);
+            // (1-s)²·(0,0) + 2(1-s)s·p + s²·(1,1); the first term is zero.
+            var q = 2f * (1f - s) * s * p + s * s * Vector2.one;
+            return new Vector3(x, q.y - 0.5f, q.x - 0.5f);
+        }
+
+        /// <summary>A straight wedge uses the shared mesh; a curved one gets its own, rebuilt when the curve changes.</summary>
+        private void RefreshWedgeCurve()
+        {
+            float c = Mathf.Clamp(Data.slopeCurve, -1f, 1f);
+            var filter = _renderer != null ? _renderer.GetComponent<MeshFilter>() : null;
+            if (filter == null) return;
+            Mesh want;
+            if (Mathf.Abs(c) < 0.005f) want = WedgeMesh;
+            else
+            {
+                if (_curvedWedgeMesh == null) { _curvedWedgeMesh = new Mesh { name = "LE_CurvedWedge" }; _wedgeCurveBuilt = float.NaN; }
+                if (!(c == _wedgeCurveBuilt))
+                {
+                    BuildCurvedWedge(_curvedWedgeMesh, c);
+                    _wedgeCurveBuilt = c;
+                    if (_solid is MeshCollider rebuilt && rebuilt.sharedMesh == _curvedWedgeMesh) { rebuilt.sharedMesh = null; rebuilt.sharedMesh = _curvedWedgeMesh; }
+                }
+                want = _curvedWedgeMesh;
+            }
+            if (filter.sharedMesh != want) filter.sharedMesh = want;
+            if (_solid is MeshCollider mc && mc.sharedMesh != want) mc.sharedMesh = want;
+        }
+
+        private static void BuildCurvedWedge(Mesh mesh, float curve)
+        {
+            int n = WedgeCurveSteps;
+            var verts = new List<Vector3>();
+            var tris = new List<int>();
+            Vector3 a = new Vector3(-0.5f, -0.5f, -0.5f), b = new Vector3(0.5f, -0.5f, -0.5f);
+            Vector3 c = new Vector3(0.5f, -0.5f, 0.5f), d = new Vector3(-0.5f, -0.5f, 0.5f);
+            Vector3 e = new Vector3(0.5f, 0.5f, 0.5f), f = new Vector3(-0.5f, 0.5f, 0.5f);
+
+            void Quad(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, int[] order)
+            {
+                int i0 = verts.Count;
+                verts.Add(p0); verts.Add(p1); verts.Add(p2); verts.Add(p3);
+                foreach (var k in order) tris.Add(i0 + k);
+            }
+            int[] quadOrder = { 0, 2, 1, 0, 3, 2 };
+            Quad(a, d, c, b, quadOrder); // bottom
+            Quad(d, f, e, c, quadOrder); // back
+
+            // The slope: one strip whose vertices are shared along the curve, so it shades smoothly.
+            int slope = verts.Count;
+            for (int k = 0; k <= n; k++)
+            {
+                float s = k / (float)n;
+                verts.Add(WedgeSlopePoint(curve, s, -0.5f));
+                verts.Add(WedgeSlopePoint(curve, s, 0.5f));
+            }
+            for (int k = 0; k < n; k++)
+            {
+                int l0 = slope + 2 * k, r0 = l0 + 1, l1 = l0 + 2, r1 = l0 + 3;
+                tris.Add(l0); tris.Add(r1); tris.Add(r0);
+                tris.Add(l0); tris.Add(l1); tris.Add(r1);
+            }
+
+            // The two sides: a column under each step of the curve.
+            for (int k = 0; k < n; k++)
+            {
+                float s0 = k / (float)n, s1 = (k + 1) / (float)n;
+                for (int side = 0; side < 2; side++)
+                {
+                    float x = side == 0 ? -0.5f : 0.5f;
+                    var t0 = WedgeSlopePoint(curve, s0, x);
+                    var t1 = WedgeSlopePoint(curve, s1, x);
+                    var b0 = new Vector3(x, -0.5f, t0.z);
+                    var b1 = new Vector3(x, -0.5f, t1.z);
+                    Quad(b0, b1, t1, t0, side == 0 ? new[] { 0, 1, 2, 0, 2, 3 } : new[] { 0, 2, 1, 0, 3, 2 });
+                }
+            }
+
+            mesh.Clear();
+            mesh.SetVertices(verts);
+            mesh.SetTriangles(tris, 0);
+            mesh.RecalculateNormals();
+            mesh.RecalculateBounds();
         }
 
         /// <summary>A unit wedge: flat bottom, vertical back face at +Z, slope rising from -Z to +Z.</summary>
