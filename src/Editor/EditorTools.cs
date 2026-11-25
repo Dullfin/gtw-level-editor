@@ -192,14 +192,14 @@ namespace GTWLevelEditor
         // ---------------- mouse mode: handles ----------------
 
         private enum GizmoMode { Move, Rotate, Scale }
-        private enum DragKind { None, MoveAxis, MovePlane, Rotate, ScaleAxis, ScaleUniform, RampPoint, Look }
+        private enum DragKind { None, MoveAxis, MovePlane, Rotate, ScaleAxis, ScaleUniform, RampPoint, Look, PointAxis, PointPlane, PointBank, PointWidth }
 
         private GizmoMode _gizmo = GizmoMode.Move;
         private DragKind _drag;
         private int _dragAxis;
-        private Vector3 _dragStartPos, _dragStartScale, _dragStartVec, _dragStartHit;
+        private Vector3 _dragStartPos, _dragStartScale, _dragStartVec, _dragStartHit, _dragAxisVec;
         private Quaternion _dragStartRot;
-        private float _dragStartT;
+        private float _dragStartT, _dragStartValue;
         private Vector2 _dragStartMouse, _lastMouse;
         private int _selectedPoint = -1;
         private int _hoverAxis = -1;
@@ -273,9 +273,44 @@ namespace GTWLevelEditor
                 return;
             }
             var hit = RaycastObject(cam.ScreenPointToRay(MousePos));
-            if (hit != null) Select(hit);
+            if (hit != null)
+            {
+                // Clicking a ramp's body (not one of its points) goes back to handles for the whole ramp.
+                if (hit == _selected && hit.IsRamp) ChoosePoint(-1);
+                Select(hit);
+            }
             else _selected = null;
         }
+
+        // ---------------- ramp point handles ----------------
+
+        /// <summary>True when a ramp point is chosen: the handles then move, bank and widen that point.</summary>
+        private bool PointGizmo => _selected != null && _selected.IsRamp && _selectedPoint >= 0 && _selectedPoint < _selected.Data.points.Count;
+
+        /// <summary>Where the handles sit: the chosen ramp point, or the selected object's origin.</summary>
+        private Vector3 GizmoCenter => PointGizmo
+            ? _selected.transform.TransformPoint(_selected.Data.points[_selectedPoint].position)
+            : _selected.transform.position;
+
+        /// <summary>The track's direction through the chosen point (world space).</summary>
+        private Vector3 PointTangent()
+        {
+            var pts = _selected.Data.points;
+            int a = Mathf.Max(_selectedPoint - 1, 0), b = Mathf.Min(_selectedPoint + 1, pts.Count - 1);
+            var t = _selected.transform.TransformDirection(pts[b].position - pts[a].position);
+            return t.sqrMagnitude < 1e-8f ? _selected.transform.forward : t.normalized;
+        }
+
+        /// <summary>Across the track at the chosen point, tilted by its bank (world space).</summary>
+        private Vector3 PointRight()
+        {
+            var t = PointTangent();
+            var r = Mathf.Abs(t.y) < 0.98f ? Vector3.Cross(Vector3.up, t).normalized : _selected.transform.right;
+            return Quaternion.AngleAxis(_selected.Data.points[_selectedPoint].bank, t) * r;
+        }
+
+        private void SetPointWorld(LevelObjectData d, Vector3 world) =>
+            d.points[_selectedPoint].position = _selected.transform.InverseTransformPoint(world);
 
         private Vector2 ToGui(Camera cam, Vector3 world, out bool visible)
         {
@@ -312,23 +347,43 @@ namespace GTWLevelEditor
                 if (_hoverKind != DragKind.None) return;
             }
 
-            var center = _selected.transform.position;
+            var center = GizmoCenter;
             var c = ToGui(cam, center, out var cVis);
             if (!cVis) return;
             float len = GizmoLength(cam, center);
             best = HandlePick;
+            bool point = PointGizmo;
 
             switch (_gizmo)
             {
                 case GizmoMode.Move:
                 {
                     var ph = ToGui(cam, PlaneHandlePos(center, len), out var pv);
-                    if (pv && Vector2.Distance(ph, mouse) < HandlePick * 1.1f) { _hoverKind = DragKind.MovePlane; return; }
+                    if (pv && Vector2.Distance(ph, mouse) < HandlePick * 1.1f) { _hoverKind = point ? DragKind.PointPlane : DragKind.MovePlane; return; }
                     for (int i = 0; i < 3; i++)
                     {
                         var e = ToGui(cam, center + WorldAxes[i] * len, out var v);
                         float d = DistToSegment(mouse, c, e);
-                        if (v && d < best) { best = d; _hoverKind = DragKind.MoveAxis; _hoverAxis = i; }
+                        if (v && d < best) { best = d; _hoverKind = point ? DragKind.PointAxis : DragKind.MoveAxis; _hoverAxis = i; }
+                    }
+                    break;
+                }
+                case GizmoMode.Scale when point:
+                {
+                    // One handle across the track: the point's width.
+                    var e = ToGui(cam, center + PointRight() * len, out var v);
+                    if (v && DistToSegment(mouse, c, e) < best) { _hoverKind = DragKind.PointWidth; _hoverAxis = 0; }
+                    break;
+                }
+                case GizmoMode.Rotate when point:
+                {
+                    // One ring around the track: the point's bank.
+                    var ring = RingPoints(cam, center, PointTangent(), len);
+                    for (int k = 0; k < ring.Count - 1; k++)
+                    {
+                        if (!ring[k].visible || !ring[k + 1].visible) continue;
+                        float d = DistToSegment(mouse, ring[k].p, ring[k + 1].p);
+                        if (d < best) { best = d; _hoverKind = DragKind.PointBank; _hoverAxis = 2; }
                     }
                     break;
                 }
@@ -431,9 +486,33 @@ namespace GTWLevelEditor
                     RayPlane(ray, WorldAxes[axis], _dragStartPos, out var h);
                     _dragStartVec = h - _dragStartPos;
                     break;
+                case DragKind.PointAxis:
+                    _dragStartPos = GizmoCenter;
+                    _dragStartT = ClosestOnAxis(ray, _dragStartPos, WorldAxes[axis]) ?? 0f;
+                    break;
+                case DragKind.PointPlane:
+                    _dragStartPos = GizmoCenter;
+                    _dragPlaneNormal = UsablePlane(cam, Vector3.up);
+                    RayPlane(ray, _dragPlaneNormal, _dragStartPos, out _dragStartHit);
+                    break;
+                case DragKind.PointBank:
+                {
+                    _dragStartPos = GizmoCenter;
+                    _dragAxisVec = PointTangent();
+                    _dragStartValue = _selected.Data.points[_selectedPoint].bank;
+                    RayPlane(ray, _dragAxisVec, _dragStartPos, out var hb);
+                    _dragStartVec = hb - _dragStartPos;
+                    break;
+                }
+                case DragKind.PointWidth:
+                    _dragStartPos = GizmoCenter;
+                    _dragAxisVec = PointRight();
+                    _dragStartValue = _selected.Data.points[_selectedPoint].width;
+                    _dragStartT = ClosestOnAxis(ray, _dragStartPos, _dragAxisVec) ?? 1f;
+                    if (Mathf.Abs(_dragStartT) < 0.05f) _dragStartT = 0.05f;
+                    break;
                 case DragKind.RampPoint:
                 {
-                    _selectedPoint = axis;
                     ChoosePoint(axis);
                     var world = t.TransformPoint(_selected.Data.points[axis].position);
                     _dragStartPos = world;
@@ -565,6 +644,47 @@ namespace GTWLevelEditor
                     d.points[_dragAxis].position = _selected.transform.InverseTransformPoint(pos);
                     break;
                 }
+                case DragKind.PointAxis:
+                {
+                    if (!PointGizmo) return;
+                    var t = ClosestOnAxis(ray, _dragStartPos, WorldAxes[_dragAxis]);
+                    if (t == null || Mathf.Abs(t.Value - _dragStartT) > 1000f) return;
+                    var pos = _dragStartPos + WorldAxes[_dragAxis] * (t.Value - _dragStartT);
+                    if (_snap) pos[_dragAxis] = Snap(pos[_dragAxis]);
+                    SetPointWorld(d, pos);
+                    break;
+                }
+                case DragKind.PointPlane:
+                {
+                    if (!PointGizmo || !RayPlane(ray, _dragPlaneNormal, _dragStartPos, out var h)) return;
+                    var delta = h - _dragStartHit;
+                    if (delta.magnitude > 3f * Vector3.Distance(cam.transform.position, _dragStartPos) + 10f) return;
+                    if (_dragPlaneNormal != Vector3.up) delta = HorizontalFromScreen(cam, delta);
+                    var pos = _dragStartPos + delta;
+                    pos.y = _dragStartPos.y;
+                    if (_snap) { pos.x = Snap(pos.x); pos.z = Snap(pos.z); }
+                    SetPointWorld(d, pos);
+                    break;
+                }
+                case DragKind.PointBank:
+                {
+                    if (!PointGizmo || !RayPlane(ray, _dragAxisVec, _dragStartPos, out var h)) return;
+                    float angle = Vector3.SignedAngle(_dragStartVec, h - _dragStartPos, _dragAxisVec);
+                    float bank = _dragStartValue + angle;
+                    if (_snap) bank = Mathf.Round(bank / 15f) * 15f;
+                    d.points[_selectedPoint].bank = Mathf.Repeat(bank + 180f, 360f) - 180f;
+                    break;
+                }
+                case DragKind.PointWidth:
+                {
+                    if (!PointGizmo) return;
+                    var t = ClosestOnAxis(ray, _dragStartPos, _dragAxisVec);
+                    if (t == null) return;
+                    float w = _dragStartValue * Mathf.Max(0.02f, t.Value / _dragStartT);
+                    if (_snap) w = Mathf.Round(w * 4f) / 4f;
+                    d.points[_selectedPoint].width = Mathf.Clamp(w, 0.2f, 60f);
+                    break;
+                }
             }
             _selected.Refresh();
         }
@@ -601,12 +721,14 @@ namespace GTWLevelEditor
 
             if (!_cursorMode || _selected == null) return;
 
-            var center = _selected.transform.position;
+            var center = GizmoCenter;
             var c = ToGui(cam, center, out var cVis);
             float len = GizmoLength(cam, center);
             float w = 4f * ui;
+            bool point = PointGizmo;
             Color Pick(int axis, DragKind kind) =>
-                (_drag == kind && _dragAxis == axis) || (_drag == DragKind.None && _hoverKind == kind && _hoverAxis == axis)
+                (_drag == kind && (_dragAxis == axis || kind == DragKind.PointBank || kind == DragKind.PointWidth))
+                || (_drag == DragKind.None && _hoverKind == kind && _hoverAxis == axis)
                     ? new Color(1f, 0.92f, 0.2f) : AxisColors[axis];
 
             if (cVis)
@@ -614,18 +736,39 @@ namespace GTWLevelEditor
                 switch (_gizmo)
                 {
                     case GizmoMode.Move:
+                    {
+                        var axisKind = point ? DragKind.PointAxis : DragKind.MoveAxis;
+                        var planeKind = point ? DragKind.PointPlane : DragKind.MovePlane;
                         for (int i = 0; i < 3; i++)
                         {
                             var e = ToGui(cam, center + WorldAxes[i] * len, out var v);
                             if (!v) continue;
-                            var col = Pick(i, DragKind.MoveAxis);
+                            var col = Pick(i, axisKind);
                             Line(c, e, col, w);
                             Dot(e, 12f * ui, col);
                         }
                         var ph = ToGui(cam, PlaneHandlePos(center, len), out var pv);
-                        bool planeHot = _drag == DragKind.MovePlane || (_drag == DragKind.None && _hoverKind == DragKind.MovePlane);
+                        bool planeHot = _drag == planeKind || (_drag == DragKind.None && _hoverKind == planeKind);
                         if (pv) Dot(ph, 16f * ui, planeHot ? new Color(1f, 0.92f, 0.2f) : new Color(1f, 0.75f, 0.2f, 0.85f));
                         break;
+                    }
+                    case GizmoMode.Rotate when point:
+                    {
+                        var col = Pick(2, DragKind.PointBank);
+                        var ring = RingPoints(cam, center, PointTangent(), len);
+                        for (int k = 0; k < ring.Count - 1; k++)
+                            if (ring[k].visible && ring[k + 1].visible) Line(ring[k].p, ring[k + 1].p, col, w * 0.8f);
+                        break;
+                    }
+                    case GizmoMode.Scale when point:
+                    {
+                        var e = ToGui(cam, center + PointRight() * len, out var v);
+                        if (!v) break;
+                        var col = Pick(0, DragKind.PointWidth);
+                        Line(c, e, col, w);
+                        Dot(e, 14f * ui, col);
+                        break;
+                    }
                     case GizmoMode.Rotate:
                         for (int i = 0; i < 3; i++)
                         {

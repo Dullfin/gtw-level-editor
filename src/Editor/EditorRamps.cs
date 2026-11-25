@@ -189,13 +189,20 @@ namespace GTWLevelEditor
 
             var pts = d.points;
             if (pts.Count == 0) return;
-            if (_selectedPoint < 0 || _selectedPoint >= pts.Count) _selectedPoint = 0;
+            if (_selectedPoint >= pts.Count) _selectedPoint = pts.Count - 1;
+            // The arrows step through the points and "whole ramp" (no point chosen: the handles move the whole ramp).
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("<", GUILayout.Width(30))) ChoosePoint((_selectedPoint + pts.Count - 1) % pts.Count);
-            GUILayout.Label($"<b>Point {_selectedPoint + 1} of {pts.Count}</b>", RichLabel());
-            if (GUILayout.Button(">", GUILayout.Width(30))) ChoosePoint((_selectedPoint + 1) % pts.Count);
+            if (GUILayout.Button("<", GUILayout.Width(30))) ChoosePoint(_selectedPoint < 0 ? pts.Count - 1 : _selectedPoint - 1);
+            GUILayout.Label(_selectedPoint < 0 ? "<b>Whole ramp</b>" : $"<b>Point {_selectedPoint + 1} of {pts.Count}</b>", RichLabel());
+            if (GUILayout.Button(">", GUILayout.Width(30))) ChoosePoint(_selectedPoint + 1 >= pts.Count ? -1 : _selectedPoint + 1);
             GUILayout.EndHorizontal();
+            if (_selectedPoint < 0)
+            {
+                GUILayout.Label("Click a white point (or use the arrows) to edit one point. Its handles then move it (W), bank it (E) and widen it (R).", Theme.Hint);
+                RememberRampStyle(d);
+                return;
+            }
 
             var pt = pts[_selectedPoint];
             var world = obj.transform.TransformPoint(pt.position);

@@ -96,6 +96,7 @@ A selected ramp's panel has:
 | W / E / R | Move / rotate / scale handles |
 | Drag an arrow, ring or box | Move along an axis, rotate, or scale. The yellow square moves along the ground; the white centre box scales evenly |
 | Drag a ramp's white points | Reshape the ramp (hold Shift to move a point up or down) |
+| Click a ramp point | Put the handles on that point: W moves it along an axis or the ground, E's ring banks it, R's handle sets its width. Click the ramp itself to get the whole-ramp handles back |
 | Delete | Delete the chosen ramp point, or the selected object |
 | Hold right mouse | Look around. While holding it, W / A / S / D fly the camera, Q / E (or Space) go down / up, and Shift goes faster |
 | Mouse wheel | Move the camera forward / back |

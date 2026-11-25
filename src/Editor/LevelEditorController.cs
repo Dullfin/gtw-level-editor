@@ -859,7 +859,8 @@ namespace GTWLevelEditor
             {
                 if (_cursorMode)
                     text += $"\n{K("Click")} select an object, then drag its handles{gap}{K("W")} move (yellow square: along the ground){gap}{K("E")} rotate{gap}{K("R")} scale" +
-                            $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down){gap}{K("Delete")} removes the chosen point or object" +
+                            $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down); a chosen point gets handles: {K("W")} move, {K("E")} bank, {K("R")} width. Click the ramp itself for whole-ramp handles" +
+                            $"\n{K("Delete")} removes the chosen point or object" +
                             $"\n{K("Hold right mouse")} look around, with {K("W")}{K("A")}{K("S")}{K("D")} to fly, {K("Q")} / {K("E")} down / up{gap}{K("Wheel")} move forward / back{gap}{K("H")} hide player" +
                             $"\n{K("Ctrl+Z")} undo{gap}{K("Ctrl+Y")} redo{gap}{K("Ctrl+D")} duplicate{gap}{K("Ctrl+C")} / {K("Ctrl+V")} copy / paste";
                 else if (_rampTool)
