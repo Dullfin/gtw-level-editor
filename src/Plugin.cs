@@ -13,7 +13,7 @@ namespace GTWLevelEditor
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.Dullfin.GTWLevelEditor";
-        public const string Version = "0.6.1";
+        public const string Version = "0.7.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -42,17 +42,18 @@ namespace GTWLevelEditor
             editor.HidePlayerInEditor = Config.Bind("Editor", "HidePlayerInEditor", false,
                 "Hide your character while editing so it doesn't block the view (toggle in game with H).");
             editor.ShowHelpWindow = Config.Bind("Editor", "ShowControlsWindow", true,
-                "Show the floating Controls window while editing. Close it with its × button; reopen it from the panel's Controls tab.");
+                "Show the floating Controls window while editing. Close it with its Ã— button; reopen it from the panel's Controls tab.");
             editor.DockedLayout = Config.Bind("Editor", "DockedLayout", true,
                 "While editing: object bar in a toolbar across the top, the panel docked on the right, and the game view in the space left over.");
+            editor.GridSize = Config.Bind("Editor", "GridSize", 0.5f,
+                "Snapping grid size in metres (0.25, 0.5, 1 or 2 from the panel's Controls tab).");
+            editor.ObjectSnap = Config.Bind("Editor", "SnapToObjects", true,
+                "While snapping, lock pieces flush against nearby objects' faces and line them up with their edges and centres.");
             editor.GridSnap = Config.Bind("Editor", "GridSnap", false,
-                "Start with grid snapping on (0.5 m steps, 15° turns). Toggle in game with G.");
+                "Start with grid snapping on (0.5 m steps, 15Â° turns). Toggle in game with G.");
             editor.UiScale = Config.Bind("Editor", "UiScale", 1f,
                 "Size of the editor UI. 1 = sized for the screen height (the same proportion at 1080p and 4K); 1.25 = 25% bigger.");
             editor.LevelsDirectory = Path.Combine(Paths.BepInExRootPath, "LevelEditor", "Levels");
-            Ice.ControlSetting = Config.Bind("Surfaces", "SlipperyControl", 0.3f,
-                new ConfigDescription("How much steering you keep on Slippery surfaces: 0 = none (pure ice), 1 = as on normal ground.",
-                    new AcceptableValueRange<float>(0f, 1f)));
 
             var debug = Config.Bind("Debug", "EnableDebugCommands", false,
                 @"Development aid: run commands written to BepInEx\LevelEditor\Debug\commands.txt (screenshots, scene dumps, starting levels).");

@@ -59,7 +59,7 @@ The bar at the top of the screen shows what each number key places. In mouse mod
 | T | Reset rotation and distance |
 | Mouse wheel | Resize (Shift: height only; Ctrl: pull the object closer or push it further away; it floats at that distance unless something nearer is under the crosshair) |
 | [ / ] | Lower / raise the launch speed of a jump pad, bumper or launcher (Shift: steps of 5) |
-| G | Toggle grid snapping (0.5 m steps, 15° turns). It's off by default, so placing and dragging are smooth |
+| G | Toggle snapping. It's off by default, so placing and dragging are smooth. When on, pieces lock flush against nearby objects' faces and line up with their edges and centres (those objects light up blue). On axes with nothing nearby they snap to the grid, shown as a faint grid around the piece. Pieces resting on a surface keep their height. Turns snap to 15°. Set the grid size (0.25 / 0.5 / 1 / 2 m) and object snapping in the Controls tab |
 | H | Hide or show your character, so it doesn't block the view |
 | Ctrl+Z / Ctrl+Y | Undo / redo |
 | Ctrl+D | Pick up a copy of the aimed object |
@@ -121,7 +121,7 @@ Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift 
 
 - **Platform, Wedge, Cylinder, Sphere, Ramp:** solid ground you can roll on and grab. Each one's surface can be:
   - **Normal.**
-  - **Slippery:** ice. You keep your speed and can steer only a little, so place it where the player arrives fast.
+  - **Slippery:** no grip, so you can't roll up it. Three sliders set how much of the main game's handling you keep on it, saved with each object: **Friction** (0% by default), **Steering** and **Air drag** (both 100%, as in the main game). Grabbing works exactly as in the main game.
   - **Sticky:** grab it to stick on, even upside down.
   - **Jump pad:** throws you off at the launch speed, so any platform, cylinder, sphere, wedge or ramp can be a jump pad. Tilt it to aim. Platforms, cylinders and spheres have a **Launch zone** slider (0–3 m, 0.6 m by default): an orange box above the top that throws you before you touch the surface. Wedges and ramps, or a zone set to "off", bounce you on contact.
 - **Hollow cylinder:** tick **Hollow** on a selected cylinder to make it an open tube you can roll through, and set its wall thickness. Size X / Z set the outside diameter and Y the length; rotate it to lie it on its side. Tick **Cut through platforms** under it and the tube cuts a hole in any platform it passes straight through, so you can roll through the tube. The tube has to run along one of the platform's axes, and its opening has to fit inside the platform.
@@ -169,9 +169,10 @@ Files saved by versions before 0.4 contain no objects (an old bug lost them on s
 | `Editor/DockedLayout` | true | Toolbar on top, panel docked on the right, game view in the rest. Also in the Controls tab |
 | `Editor/ShowControlsWindow` | true | Show the floating Controls window. Close it with its ×; reopen it from the Controls tab |
 | `Editor/FlyVerticalSpeed` | 8 | Fly up / down speed in m/s |
-| `Editor/GridSnap` | false | Start with grid snapping on (also G in game) |
+| `Editor/GridSnap` | false | Start with snapping on (also G in game) |
+| `Editor/GridSize` | 0.5 | Snapping grid size in metres |
+| `Editor/SnapToObjects` | true | While snapping, lock pieces against nearby objects' faces, edges and centres |
 | `Editor/HidePlayerInEditor` | false | Hide your character while editing (also H in game, or the panel checkbox) |
-| `Surfaces/SlipperyControl` | 0.3 | Steering kept on Slippery surfaces: 0 = pure ice, 1 = normal ground |
 | `Debug/EnableDebugCommands` | false | Development aid; see below |
 
 ## Building

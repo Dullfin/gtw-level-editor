@@ -149,11 +149,17 @@ namespace GTWLevelEditor
             shape.layer = GameBridge.GroundLayer;
             var ice = shape.GetComponent<SlipperySurface>();
             bool slippery = Data.IsSolidShape && !Data.IsLauncher && Data.Surface == SurfaceType.Slippery;
-            if (slippery && ice == null) shape.AddComponent<SlipperySurface>();
-            else if (!slippery && ice != null) Destroy(ice);
-            // Friction combines with the ball's "Maximum" mode, so the surface needs no grip of its own too.
+            if (slippery && ice == null) ice = shape.AddComponent<SlipperySurface>();
+            else if (!slippery && ice != null) { Destroy(ice); ice = null; }
+            if (ice != null)
+            {
+                ice.Friction = Mathf.Clamp01(Data.iceFriction);
+                ice.Steering = Mathf.Clamp01(Data.iceSteering);
+                ice.Drag = Mathf.Clamp01(Data.iceDrag);
+            }
+            // Friction combines with the ball's "Maximum" mode, so the surface's own grip is scaled too.
             var col = shape.GetComponent<Collider>();
-            if (col != null) col.sharedMaterial = slippery ? Ice.SurfaceMaterial : null;
+            if (col != null) col.sharedMaterial = ice != null ? ice.Material : null;
             if (Data.IsLauncher || Data.Kind == ObjectKind.Pendulum)
             {
                 // The game's launchers are grabbed through the Sticky tag: it glues you on and

@@ -412,6 +412,7 @@ namespace GTWLevelEditor
 
             var ray = CenterRay();
             Vector3 pos;
+            int along = -1; // the axis the ghost rests along on a surface (its height on a floor)
             // A surface closer than the chosen distance still catches it; otherwise it floats at that distance.
             if (RaycastSurface(ray, _ghostReach > 0f ? _ghostReach : 80f, out var hit))
             {
@@ -420,23 +421,24 @@ namespace GTWLevelEditor
                 var n = hit.normal;
                 float offset = Mathf.Abs(n.x) * b.extents.x + Mathf.Abs(n.y) * b.extents.y + Mathf.Abs(n.z) * b.extents.z;
                 pos = hit.point + n * offset - b.center;
+                along = Mathf.Abs(n.y) >= Mathf.Abs(n.x) && Mathf.Abs(n.y) >= Mathf.Abs(n.z) ? 1 : Mathf.Abs(n.x) >= Mathf.Abs(n.z) ? 0 : 2;
             }
             else
             {
                 pos = ray.GetPoint(_ghostReach > 0f ? _ghostReach : _ghostDistance);
             }
-            if (_snap) pos = new Vector3(Snap(pos.x), Snap(pos.y), Snap(pos.z));
+            // Resting on a surface keeps that height (or depth against a wall): only the other axes snap.
+            pos = SnapPosition(ghost, BoundsAt(ghost, pos), pos, along != 0, along != 1, along != 2);
             ghost.Data.position = pos;
             ghost.Refresh();
         }
 
-        private static float Snap(float v) => Mathf.Round(v * 2f) / 2f;
 
         private void SetSnap(bool on)
         {
             _snap = on;
             if (GridSnap != null) GridSnap.Value = on;
-            Toast(on ? "Grid snap on (0.5 m, 15°)" : "Grid snap off");
+            Toast(on ? $"Snapping on ({GridStep:0.##} m grid, 15°{(ObjectSnapOn ? ", to other objects" : "")})" : "Snapping off");
         }
 
         private bool RaycastSurface(Ray ray, float distance, out RaycastHit best)
@@ -1154,9 +1156,15 @@ namespace GTWLevelEditor
                 {
                     d.Surface = surfaces[chosen];
                     if (d.Surface == SurfaceType.JumpPad && d.force <= 0f) d.force = 20f;
+                    if (d.Surface == SurfaceType.Slippery) { d.iceFriction = 0f; d.iceSteering = 1f; d.iceDrag = 1f; }
                 }
                 if (d.Surface == SurfaceType.Slippery)
-                    GUILayout.Label("Icy: almost no grip, so you keep your speed and steer weakly.", Theme.Hint);
+                {
+                    d.iceFriction = PercentSlider("Friction", d.iceFriction);
+                    d.iceSteering = PercentSlider("Steering", d.iceSteering);
+                    d.iceDrag = PercentSlider("Air drag", d.iceDrag);
+                    GUILayout.Label("How much of the main game's grip, steering and slowing drag you keep on it. 100% is normal ground; 0% friction means you can't roll up it.", Theme.Hint);
+                }
                 else if (d.Surface == SurfaceType.Sticky)
                     GUILayout.Label("Grab it to stick on, even upside down.", Theme.Hint);
                 else if (d.Surface == SurfaceType.JumpPad)
@@ -1279,6 +1287,18 @@ namespace GTWLevelEditor
         }
 
         /// <summary>A labelled number box with − / + buttons.</summary>
+        /// <summary>A 0-100% slider in 5% steps.</summary>
+        private static float PercentSlider(string label, float value)
+        {
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(label, GUILayout.Width(110));
+            value = GUILayout.HorizontalSlider(Mathf.Clamp01(value), 0f, 1f, GUILayout.ExpandWidth(true));
+            value = Mathf.Round(value * 20f) / 20f;
+            GUILayout.Label($"{value * 100f:0}%", GUILayout.Width(64));
+            GUILayout.EndHorizontal();
+            return value;
+        }
+
         private float FloatField(string label, string key, float value, float step)
         {
             GUILayout.BeginHorizontal();

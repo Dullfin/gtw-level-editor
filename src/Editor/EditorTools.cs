@@ -574,7 +574,7 @@ namespace GTWLevelEditor
                     if (t == null) return;
                     if (Mathf.Abs(t.Value - _dragStartT) > 1000f) return;
                     var pos = _dragStartPos + WorldAxes[_dragAxis] * (t.Value - _dragStartT);
-                    if (_snap) pos[_dragAxis] = Snap(pos[_dragAxis]);
+                    pos = SnapPosition(_selected, BoundsAt(_selected, pos), pos, _dragAxis == 0, _dragAxis == 1, _dragAxis == 2);
                     ShiftPivot(d, pos);
                     d.position = pos;
                     break;
@@ -587,7 +587,7 @@ namespace GTWLevelEditor
                     if (_dragPlaneNormal != Vector3.up) delta = HorizontalFromScreen(cam, delta);
                     var pos = _dragStartPos + delta;
                     pos.y = _dragStartPos.y;
-                    if (_snap) { pos.x = Snap(pos.x); pos.z = Snap(pos.z); }
+                    pos = SnapPosition(_selected, BoundsAt(_selected, pos), pos, true, false, true);
                     ShiftPivot(d, pos);
                     d.position = pos;
                     break;
@@ -703,6 +703,7 @@ namespace GTWLevelEditor
             DrawLaunchPaths(cam, ui);
             DrawMotionPaths(cam, ui);
             DrawJumpZones(cam, ui);
+            DrawSnapGuides(cam, ui);
 
             if (!_cursorMode && _rampTool)
             {

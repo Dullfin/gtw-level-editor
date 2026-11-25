@@ -57,9 +57,15 @@ namespace GTWLevelEditor
             if (hide != HidePlayerInEditor.Value) HidePlayerInEditor.Value = hide;
             GUILayout.EndVertical();
 
+            Theme.Section("Snapping");
+            GUILayout.BeginVertical(Theme.Card);
+            DrawSnapSettings();
+            GUILayout.Label("Placed and moved pieces lock flush against nearby objects' faces and line up with their edges and centres (they light up blue). Otherwise their centre snaps to the grid. Pieces resting on a surface keep their height.", Theme.Hint);
+            GUILayout.EndVertical();
+
             const string line = "\n";
             Theme.Section("Anywhere");
-            GUILayout.Label($"{K(CursorModeKey.Value.ToString())} mouse mode on / off{line}{K(ToggleEditorKey.Value.ToString())} play / edit{line}{K("G")} grid snap", RichLabel());
+            GUILayout.Label($"{K(CursorModeKey.Value.ToString())} mouse mode on / off{line}{K(ToggleEditorKey.Value.ToString())} play / edit{line}{K("G")} snapping on / off", RichLabel());
             Theme.Section("Placing (fly mode)");
             GUILayout.Label(PlacingControls(line), RichLabel());
             Theme.Section("Drawing a ramp (key 2)");
