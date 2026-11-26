@@ -36,8 +36,6 @@ namespace GTWLevelEditor
 
         // ---------------- shortcuts ----------------
 
-        private LevelObjectData _clipboard;
-
         private void HandleShortcuts()
         {
             if (!Ctrl) return;
@@ -45,17 +43,27 @@ namespace GTWLevelEditor
             else if (EditorKeys.Down(EditorAction.Redo)) Redo();
             else if (EditorKeys.Down(EditorAction.Copy))
             {
-                var src = _cursorMode ? _selected : (AimedObject() ?? _selected);
-                if (src != null) { _clipboard = src.Data.Clone(); Toast("Copied " + src.Kind); }
+                if (_cursorMode) CopySelection(SelectionList());
+                else
+                {
+                    var src = AimedObject() ?? _selected;
+                    if (src != null) CopySelection(new List<LevelObject> { src });
+                }
             }
-            else if (EditorKeys.Down(EditorAction.Paste) && _clipboard != null)
+            else if (EditorKeys.Down(EditorAction.Paste) && _clipboard != null && _clipboard.Count > 0)
             {
-                if (_cursorMode) AddCopy(_clipboard);
-                else HoldCopy(_clipboard);
+                if (_clipboard.Count > 1)
+                {
+                    if (_cursorMode) AddCopies(_clipboard, PasteBesideShift(_clipboardSize));
+                    else PasteGroupAtCrosshair(_clipboard);
+                }
+                else if (_cursorMode) AddCopy(_clipboard[0]);
+                else HoldCopy(_clipboard[0]);
             }
+            else if (EditorKeys.Down(EditorAction.SelectAll) && _cursorMode) SelectAll();
             else if (EditorKeys.Down(EditorAction.Duplicate))
             {
-                if (_cursorMode) DuplicateSelected();
+                if (_cursorMode) DuplicateSelection();
                 else
                 {
                     var src = AimedObject() ?? _selected;
@@ -100,6 +108,7 @@ namespace GTWLevelEditor
         {
             public List<LevelObjectData> Objects;
             public int Selected;
+            public List<int> Group;
         }
 
         private readonly List<Snapshot> _undo = new List<Snapshot>();
@@ -111,6 +120,7 @@ namespace GTWLevelEditor
         {
             Objects = _objects.Select(o => o.Data.Clone()).ToList(),
             Selected = _selected != null ? _objects.IndexOf(_selected) : -1,
+            Group = GroupActive ? _group.Select(o => _objects.IndexOf(o)).Where(i => i >= 0).ToList() : null,
         };
 
         /// <summary>Records the level as it is now (or as given), before a change.</summary>
@@ -183,6 +193,8 @@ namespace GTWLevelEditor
                 _objects.Add(o);
             }
             _selected = s.Selected >= 0 && s.Selected < _objects.Count ? _objects[s.Selected] : null;
+            _group.Clear();
+            if (s.Group != null && _selected != null) _group.AddRange(s.Group.Where(i => i < _objects.Count).Select(i => _objects[i]));
             _selectedPoint = -1;
             _fieldText.Clear();
             _panelEditObject = null;
@@ -192,7 +204,7 @@ namespace GTWLevelEditor
         // ---------------- mouse mode: handles ----------------
 
         private enum GizmoMode { Move, Rotate, Scale }
-        private enum DragKind { None, MoveAxis, MovePlane, Rotate, ScaleAxis, ScaleUniform, RampPoint, Look, PointAxis, PointPlane, PointBank, PointWidth, WedgeCurve }
+        private enum DragKind { None, MoveAxis, MovePlane, Rotate, ScaleAxis, ScaleUniform, RampPoint, Look, PointAxis, PointPlane, PointBank, PointWidth, WedgeCurve, CogCamera }
 
         private GizmoMode _gizmo = GizmoMode.Move;
         private DragKind _drag;
@@ -223,7 +235,8 @@ namespace GTWLevelEditor
                 if (!Ctrl && EditorKeys.Down(EditorAction.HandlesMove)) _gizmo = GizmoMode.Move;
                 if (!Ctrl && EditorKeys.Down(EditorAction.HandlesRotate)) _gizmo = GizmoMode.Rotate;
                 if (!Ctrl && EditorKeys.Down(EditorAction.HandlesScale)) _gizmo = GizmoMode.Scale;
-                if (EditorKeys.Down(EditorAction.DeleteSelected) && _selected != null)
+                if (EditorKeys.Down(EditorAction.DeleteSelected) && GroupActive) DeleteSelection();
+                else if (EditorKeys.Down(EditorAction.DeleteSelected) && _selected != null)
                 {
                     if (_selected.IsRamp && _selectedPoint >= 0 && _selected.Data.points.Count > 2)
                     {
@@ -255,6 +268,7 @@ namespace GTWLevelEditor
             if (wheel != 0f && !MouseOverWindow()) cam.transform.position += cam.transform.forward * wheel * (Shift ? 4f : 1.5f);
 
             if (_selected == null) _drag = DragKind.None;
+            if (UpdateWorldPress(cam, mouse)) return;
             if (_drag != DragKind.None)
             {
                 if (!_mouseHeld || _mouseUp) { _drag = DragKind.None; return; }
@@ -272,20 +286,14 @@ namespace GTWLevelEditor
                 BeginDrag(cam, mouse, _hoverKind, _hoverAxis);
                 return;
             }
-            var hit = RaycastObject(cam.ScreenPointToRay(MousePos));
-            if (hit != null)
-            {
-                // Clicking a ramp's body (not one of its points) goes back to handles for the whole ramp.
-                if (hit == _selected && hit.IsRamp) ChoosePoint(-1);
-                Select(hit);
-            }
-            else _selected = null;
+            // Not on a handle: a click selects what's under the mouse, a drag draws a selection box.
+            BeginWorldPress(mouse);
         }
 
         // ---------------- ramp point handles ----------------
 
         /// <summary>True when a ramp point is chosen: the handles then move, bank and widen that point.</summary>
-        private bool PointGizmo => _selected != null && _selected.IsRamp && _selectedPoint >= 0 && _selectedPoint < _selected.Data.points.Count;
+        private bool PointGizmo => _selected != null && !GroupActive && _selected.IsRamp && _selectedPoint >= 0 && _selectedPoint < _selected.Data.points.Count;
 
         /// <summary>Where the handles sit: the chosen ramp point, or the selected object's origin.</summary>
         private Vector3 GizmoCenter => PointGizmo
@@ -335,7 +343,9 @@ namespace GTWLevelEditor
             if (_selected == null || MouseOverWindow()) return;
             float best = HandlePick;
 
-            if (_selected.IsRamp)
+            bool group = GroupActive;
+            if (group && _gizmo == GizmoMode.Scale) return; // scaling is one piece at a time
+            if (_selected.IsRamp && !group)
             {
                 var pts = _selected.Data.points;
                 for (int i = 0; i < pts.Count; i++)
@@ -345,6 +355,12 @@ namespace GTWLevelEditor
                     if (vis && d < best) { best = d; _hoverKind = DragKind.RampPoint; _hoverAxis = i; }
                 }
                 if (_hoverKind != DragKind.None) return;
+            }
+
+            if (HasCogCameraMarker)
+            {
+                var cc = ToGui(cam, CogCameraMarker, out var ccv);
+                if (ccv && Vector2.Distance(cc, mouse) < HandlePick * 1.1f) { _hoverKind = DragKind.CogCamera; _hoverAxis = 0; return; }
             }
 
             var center = GizmoCenter;
@@ -473,6 +489,7 @@ namespace GTWLevelEditor
             _dragStartPos = t.position;
             _dragStartRot = t.rotation;
             _dragStartScale = _selected.Data.scale;
+            BeginGroupDrag(kind);
             var ray = MouseRay(cam);
             switch (kind)
             {
@@ -515,6 +532,11 @@ namespace GTWLevelEditor
                     _dragStartValue = _selected.Data.points[_selectedPoint].width;
                     _dragStartT = ClosestOnAxis(ray, _dragStartPos, _dragAxisVec) ?? 1f;
                     if (Mathf.Abs(_dragStartT) < 0.05f) _dragStartT = 0.05f;
+                    break;
+                case DragKind.CogCamera:
+                    _dragStartPos = CogCameraMarker;
+                    _dragPlaneNormal = (cam.transform.position - _dragStartPos).normalized;
+                    RayPlane(ray, _dragPlaneNormal, _dragStartPos, out _dragStartHit);
                     break;
                 case DragKind.WedgeCurve:
                     _dragStartPos = WedgeCurveHandle(cam);
@@ -696,6 +718,20 @@ namespace GTWLevelEditor
                     d.points[_selectedPoint].width = Mathf.Clamp(w, 0.2f, 60f);
                     break;
                 }
+                case DragKind.CogCamera:
+                {
+                    if (!HasCogCameraMarker || !RayPlane(ray, _dragPlaneNormal, _dragStartPos, out var h)) return;
+                    var delta = h - _dragStartHit;
+                    if (delta.magnitude > 3f * Vector3.Distance(cam.transform.position, _dragStartPos) + 10f) return;
+                    var pos = _dragStartPos + delta;
+                    if (_snap) { pos.x = Snap(pos.x); pos.y = Snap(pos.y); pos.z = Snap(pos.z); }
+                    var world = pos - _selected.transform.position;
+                    float m = world.magnitude;
+                    if (m < 2f) world = m < 1e-4f ? Vector3.up * 2f : world / m * 2f;
+                    else if (m > 40f) world = world / m * 40f;
+                    d.cogCameraOffset = Quaternion.Inverse(_selected.transform.rotation) * world;
+                    break;
+                }
                 case DragKind.WedgeCurve:
                 {
                     if (!IsWedge) return;
@@ -710,6 +746,26 @@ namespace GTWLevelEditor
                 }
             }
             _selected.Refresh();
+            ContinueGroupDrag();
+        }
+
+        // ---------------- cog launcher camera marker ----------------
+
+        /// <summary>A selected cog launcher with a custom riding camera shows a marker you can drag, in any handle mode.</summary>
+        private bool HasCogCameraMarker => _selected != null && _selected.Data.Kind == ObjectKind.CogLauncher && _selected.Data.cogCamera;
+
+        private Vector3 CogCameraMarker => _selected.transform.position + _selected.transform.rotation * _selected.Data.cogCameraOffset;
+
+        private void DrawCogCameraMarker(Camera cam, float ui)
+        {
+            bool hot = _drag == DragKind.CogCamera || (_drag == DragKind.None && _hoverKind == DragKind.CogCamera);
+            var col = hot ? new Color(1f, 0.92f, 0.2f) : new Color(0.35f, 0.8f, 1f);
+            var m = ToGui(cam, CogCameraMarker, out var mv);
+            var c = ToGui(cam, _selected.transform.position, out var cv);
+            if (mv && cv) Line(m, c, new Color(col.r, col.g, col.b, 0.6f), 2f * ui);
+            if (!mv) return;
+            Dot(m, 18f * ui, col);
+            Dot(m, 8f * ui, new Color(0.1f, 0.15f, 0.2f));
         }
 
         // ---------------- wedge slope curve handle ----------------
@@ -784,7 +840,10 @@ namespace GTWLevelEditor
                 return;
             }
 
+            if (_cursorMode) DrawSelectionOverlay(cam, ui);
             if (!_cursorMode || _selected == null) return;
+
+            if (HasCogCameraMarker) DrawCogCameraMarker(cam, ui);
 
             var center = GizmoCenter;
             var c = ToGui(cam, center, out var cVis);

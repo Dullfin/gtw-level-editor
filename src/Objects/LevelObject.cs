@@ -84,7 +84,7 @@ namespace GTWLevelEditor
                     shape.AddComponent<MeshRenderer>();
                     shape.AddComponent<MeshCollider>().sharedMesh = WedgeMesh;
                     break;
-                default: // Platform, KillZone
+                default: // Platform, KillZone, Sign
                     shape = GameObject.CreatePrimitive(PrimitiveType.Cube);
                     break;
             }
@@ -112,6 +112,7 @@ namespace GTWLevelEditor
                 if (IsMarker) _solid.isTrigger = true;
                 if (NeedsTrigger(Data.Kind)) BuildTrigger();
             }
+            if (Data.Kind == ObjectKind.Sign) BuildSign();
         }
 
         /// <summary>Start, Checkpoint and Finish: shown only while editing, and never solid.</summary>
@@ -198,6 +199,7 @@ namespace GTWLevelEditor
             RefreshJumpZone();
             RefreshPendulum();
             RefreshMotionBody();
+            RefreshSign();
         }
 
         /// <summary>Rebuilds the ramp mesh when its points or shape changed; the collider only while not a ghost.</summary>
@@ -285,6 +287,7 @@ namespace GTWLevelEditor
         private void Update()
         {
             if (_cooldown > 0f) _cooldown -= Time.deltaTime;
+            UpdateCogCamera();
         }
 
         internal void OnPlayerEnter()
@@ -342,6 +345,7 @@ namespace GTWLevelEditor
 
         private void OnDestroy()
         {
+            StopCogCamera();
             if (_material != null) Destroy(_material);
             foreach (var m in _extraMaterials) if (m.material != null) Destroy(m.material);
             if (_rampMesh != null) Destroy(_rampMesh);

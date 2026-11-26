@@ -26,6 +26,8 @@ namespace GTWLevelEditor
         CogLauncher,
         /// <summary>The game's swinging pendulum: a sticky bob on a rod, hinged at the object's position.</summary>
         Pendulum,
+        /// <summary>A board with text on it (or floating text), for directions and messages.</summary>
+        Sign,
     }
 
     /// <summary>How a piece moves in play mode.</summary>
@@ -116,6 +118,23 @@ namespace GTWLevelEditor
         public float travel = 4.5f;
         /// <summary>A cog launcher's spin in degrees per second (negative spins the other way).</summary>
         public float spin = 180f;
+        /// <summary>A cog launcher: use <see cref="cogCameraOffset"/> for the riding camera instead of the automatic view.</summary>
+        public bool cogCamera;
+        /// <summary>Where the riding camera sits, from the cog's centre, in the cog's own (rotated, unscaled) frame. It always looks at the centre.</summary>
+        public Vector3 cogCameraOffset = new Vector3(0f, 4f, -8f);
+
+        // ---- signs only ----
+        /// <summary>The sign's text; new lines are kept.</summary>
+        public string text = "Sign";
+        public Color textColor = Color.white;
+        /// <summary>0.1-1: the largest the text may grow, as a share of the size that fills the board.</summary>
+        public float textSize = 1f;
+        /// <summary>Show the board behind the text; without it the text floats and nothing is solid.</summary>
+        public bool signBoard = true;
+        /// <summary>Text on the back as well as the front.</summary>
+        public bool signBothSides;
+        /// <summary>Monospaced text for ASCII art: every character the same width, lines kept left-aligned and never wrapped.</summary>
+        public bool signMono;
 
         // ---- motion (moving platforms, rotating groups, swinging pieces) ----
         public string motion = nameof(MotionType.None);
@@ -232,6 +251,9 @@ namespace GTWLevelEditor
                     // Copied from the game's Pendulum_Small (Doinkler 4-5): ±25° every 3 s, swinging across its facing.
                     d.color = new Color(1f, 0.5f, 0.12f);
                     d.Motion = MotionType.Swing; d.axis = 0; d.swingAngle = 25f; d.swingPeriod = 3f; d.length = 3.2f;
+                    break;
+                case ObjectKind.Sign:
+                    d.scale = new Vector3(4f, 2f, 0.2f); d.color = new Color(0.45f, 0.3f, 0.18f);
                     break;
                 case ObjectKind.CogLauncher:
                     d.scale = new Vector3(10f, 3f, 10f); d.color = new Color(0.85f, 0.62f, 0.25f);

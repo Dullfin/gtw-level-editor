@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Isto.GTW.Camera;
 using UnityEngine;
 
 namespace GTWLevelEditor
@@ -50,16 +51,19 @@ namespace GTWLevelEditor
                 shape.transform.SetParent(_moving, false);
                 shape.transform.localScale = new Vector3(1f, 0.5f, 1f);
                 DestroyImmediate(shape.GetComponent<Collider>());
+                // Like the game's GiantWheel, the grab surface is one smooth disc and the teeth are only for show:
+                // solid teeth (or the primitive's 20 flat sides) moving at ~16 m/s on the rim knock the ball off
+                // before the grab can hold. The disc reaches the tips of the teeth so the ball rides on them.
                 var mc = shape.AddComponent<MeshCollider>();
-                mc.sharedMesh = shape.GetComponent<MeshFilter>().sharedMesh;
+                mc.sharedMesh = CogGripMesh;
                 mc.convex = true;
-                // Teeth around the rim, also sticky.
+                // Teeth around the rim.
                 const int teeth = 16;
                 for (int i = 0; i < teeth; i++)
                 {
                     float a = i * Mathf.PI * 2f / teeth;
                     var tooth = AddPart(PrimitiveType.Cube, "Tooth", new Vector3(Mathf.Cos(a) * 0.52f, 0f, Mathf.Sin(a) * 0.52f),
-                                        new Vector3(0.07f, 0.96f, 0.09f), 0.8f, solid: true);
+                                        new Vector3(0.07f, 0.96f, 0.09f), 0.8f, solid: false);
                     tooth.transform.localRotation = Quaternion.Euler(0f, -a * Mathf.Rad2Deg, 0f);
                 }
                 // Hub on both faces.
@@ -215,6 +219,160 @@ namespace GTWLevelEditor
             foreach (var c in _extraSolids) c.enabled = on && !_isGhost;
         }
 
+        // ---------------- cog camera ----------------
+
+        private PlayerCameraOverride.CameraOverride _cogCamera;
+        private PlayerCameraOverride _cogCameraOwner;
+        private Transform _cogCameraAnchor;
+        /// <summary>The player outline this cog switched on, to switch off again when the ride ends.</summary>
+        private Behaviour _cogOutline;
+
+        /// <summary>
+        /// While the player rides a cog, push a camera override like the game's PlayerCameraOverrideTrigger on
+        /// its wheels: the camera holds a point set back and above the cog, looking down at its centre,
+        /// instead of whirling round with the player.
+        /// </summary>
+        private void UpdateCogCamera()
+        {
+            if (Data.Kind != ObjectKind.CogLauncher || _movingBody == null) return;
+            var player = GameBridge.Player;
+            bool running = Running && player != null;
+            bool riding = running && player.IsGrabLinkActive && player.GrabLinkParentRigidbody == _movingBody;
+            if (riding && !_riding)
+            {
+                StopCogCamera(); // grabbed again while the camera was still easing back
+                _riding = true;
+                StartCogCamera(player);
+                ShowPlayerOutline(player);
+                return;
+            }
+            if (!riding && _riding)
+            {
+                // Let go: keep the override and slide its pivot back to the player, so the camera follows you
+                // smoothly instead of jumping. The view turns back through the game's usual auto-rotate.
+                _riding = false;
+                HidePlayerOutline();
+                if (running && _cogCamera != null && _cogCameraAnchor != null)
+                {
+                    _cogReturn = 0f;
+                    _cogReturnFrom = _cogCameraAnchor.position;
+                    _cogCamera.hasRotationOverride = false;
+                    var vcam = player.PlayerVirtualCameraController;
+                    _cogReturnDistance = vcam != null ? vcam.Distance : _cogCamera.distanceOverride;
+                }
+                else StopCogCamera();
+            }
+            if (_cogReturn < 0f) return;
+            if (!running) { StopCogCamera(); return; }
+            _cogReturn += Time.deltaTime / CogCameraReturnTime;
+            if (_cogReturn >= 1f) { StopCogCamera(); return; }
+            float t = Mathf.SmoothStep(0f, 1f, _cogReturn);
+            var target = player.PlayerModelController != null ? player.PlayerModelController.transform.position : player.PlayerPosition;
+            _cogCameraAnchor.position = Vector3.Lerp(_cogReturnFrom, target, t);
+            _cogCamera.distanceOverride = Mathf.Lerp(_cogRideDistance, _cogReturnDistance, t);
+        }
+
+        /// <summary>Seconds the camera takes to glide back to the player after letting go of a cog.</summary>
+        private const float CogCameraReturnTime = 0.75f;
+        private float _cogReturn = -1f, _cogRideDistance, _cogReturnDistance;
+        private Vector3 _cogReturnFrom;
+
+        private void StartCogCamera(Isto.GTW.Player.PlayerController player)
+        {
+            var owner = player.PlayerVirtualCameraController != null ? player.PlayerVirtualCameraController.PlayerCameraOverride : null;
+            if (owner == null) return;
+
+            if (_cogCameraAnchor == null)
+            {
+                _cogCameraAnchor = new GameObject("CogCamera").transform;
+                _cogCameraAnchor.SetParent(transform, false);
+            }
+            var cam = Camera.main;
+            Vector3 offset = CogCameraWorldOffset(cam != null ? cam.transform.position : transform.position - player.DirectionFlat);
+            // The game's camera sits "distance" behind its pivot and is pulled in towards the pivot when something
+            // blocks the view. A pivot at the cog's centre is inside the cog, so the camera could end up in it:
+            // put the pivot just in front of the camera point instead, in open air outside the cog.
+            float dist = offset.magnitude;
+            float pivotBack = Mathf.Min(1.5f, dist * 0.5f);
+            _cogCameraAnchor.position = transform.position + offset * (1f - pivotBack / dist);
+            _cogCameraAnchor.rotation = Quaternion.LookRotation(-offset, Vector3.up);
+
+            _cogRideDistance = pivotBack;
+            _cogCamera = new PlayerCameraOverride.CameraOverride
+            {
+                source = this,
+                priority = 10,
+                hasPositionOverride = true,
+                hasRotationOverride = true,
+                positionRotationOverride = _cogCameraAnchor,
+                hasDistanceOverride = true,
+                distanceOverride = pivotBack,
+            };
+            owner.AddCameraOverride(_cogCamera, checkForDouble: true);
+            _cogCameraOwner = owner;
+        }
+
+        /// <summary>
+        /// Where the riding camera sits relative to the cog's centre (world space): the level's chosen point, or
+        /// the automatic view, set back and above on the face nearest <paramref name="cameraPos"/>.
+        /// </summary>
+        public Vector3 CogCameraWorldOffset(Vector3 cameraPos)
+        {
+            if (Data.cogCamera && Data.cogCameraOffset.sqrMagnitude > 0.01f) return transform.rotation * Data.cogCameraOffset;
+            return AutoCogCameraOffset(cameraPos);
+        }
+
+        /// <summary>The automatic riding view, as an offset from the cog's centre (world space).</summary>
+        public Vector3 AutoCogCameraOffset(Vector3 cameraPos)
+        {
+            Vector3 centre = transform.position, axis = transform.up;
+            Vector3 toCam = cameraPos - centre;
+            // The face of the cog nearest the camera.
+            Vector3 side = Vector3.Dot(toCam, axis) >= 0f ? axis : -axis;
+            Vector3 back = Vector3.ProjectOnPlane(side, Vector3.up);
+            float rise = 0.5f;
+            if (back.sqrMagnitude < 0.25f)
+            {
+                // A flat, turntable-like cog: keep looking the way the camera already faces, from higher up.
+                back = Vector3.ProjectOnPlane(toCam, Vector3.up);
+                if (back.sqrMagnitude < 0.0001f) back = -Vector3.forward;
+                rise = 0.8f;
+            }
+            float radius = 0.55f * Mathf.Max(transform.lossyScale.x, transform.lossyScale.z);
+            return (back.normalized + Vector3.up * rise).normalized * (radius * 2f + 4f);
+        }
+
+        private bool _riding;
+
+        /// <summary>
+        /// The game's cogs switch on the player model's Outline (a SetPlayerOutlineEvent) while you ride them, so you
+        /// can see your character in blue where it sinks into or hides behind the cog.
+        /// </summary>
+        private void ShowPlayerOutline(Isto.GTW.Player.PlayerController player)
+        {
+            var outline = player.PlayerModelController != null ? player.PlayerModelController.OutlineShader : null;
+            if (outline == null || outline.enabled) return; // already on: leave it to whoever turned it on
+            outline.enabled = true;
+            _cogOutline = outline;
+        }
+
+        private void HidePlayerOutline()
+        {
+            if (_cogOutline != null) _cogOutline.enabled = false;
+            _cogOutline = null;
+        }
+
+        /// <summary>Ends the ride's camera override and outline at once (also on deletion and when editing starts).</summary>
+        private void StopCogCamera()
+        {
+            _riding = false;
+            _cogReturn = -1f;
+            if (_cogCameraOwner != null) _cogCameraOwner.RemoveCameraOverride(this);
+            _cogCameraOwner = null;
+            _cogCamera = null;
+            HidePlayerOutline();
+        }
+
         /// <summary>Back to the resting pose, for editing.</summary>
         private void ResetLauncher()
         {
@@ -227,6 +385,44 @@ namespace GTWLevelEditor
             _movingBody.position = _moving.position;
             _movingBody.rotation = _moving.rotation;
             SetCollidersEnabled(true);
+        }
+
+        private static Mesh _cogGripMesh;
+
+        /// <summary>
+        /// The cog's grab collider, in the cylinder primitive's space (height 2, y ±1): a smooth 48-sided disc
+        /// out to the teeth's tips (radius 0.555 against the visible rim's 0.5).
+        /// </summary>
+        private static Mesh CogGripMesh
+        {
+            get
+            {
+                if (_cogGripMesh != null) return _cogGripMesh;
+                const int sides = 48;
+                const float r = 0.555f;
+                var verts = new Vector3[sides * 2 + 2];
+                for (int i = 0; i < sides; i++)
+                {
+                    float a = i * Mathf.PI * 2f / sides;
+                    var p = new Vector3(Mathf.Cos(a) * r, 0f, Mathf.Sin(a) * r);
+                    verts[i] = p + Vector3.up;
+                    verts[sides + i] = p + Vector3.down;
+                }
+                verts[sides * 2] = Vector3.up;
+                verts[sides * 2 + 1] = Vector3.down;
+                var tris = new List<int>(sides * 12);
+                for (int i = 0; i < sides; i++)
+                {
+                    int j = (i + 1) % sides;
+                    tris.AddRange(new[] { sides * 2, j, i });                       // top
+                    tris.AddRange(new[] { sides * 2 + 1, sides + i, sides + j });   // bottom
+                    tris.AddRange(new[] { i, j, sides + j, i, sides + j, sides + i }); // side
+                }
+                _cogGripMesh = new Mesh { name = "LE_CogGrip", vertices = verts, triangles = tris.ToArray() };
+                _cogGripMesh.RecalculateNormals();
+                _cogGripMesh.RecalculateBounds();
+                return _cogGripMesh;
+            }
         }
 
         /// <summary>A flat arrow pointing along +Z, seen from both sides.</summary>

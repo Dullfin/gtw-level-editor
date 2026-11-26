@@ -82,20 +82,20 @@ namespace GTWLevelEditor
         {
             ObjectKind.Platform, ObjectKind.Ramp, ObjectKind.Wedge, ObjectKind.Cylinder, ObjectKind.Sphere, ObjectKind.JumpPad,
             ObjectKind.Bumper, ObjectKind.Launcher, ObjectKind.WallLauncher, ObjectKind.CogLauncher,
-            ObjectKind.Checkpoint, ObjectKind.Start, ObjectKind.Finish, ObjectKind.KillZone, ObjectKind.Pendulum,
+            ObjectKind.Checkpoint, ObjectKind.Start, ObjectKind.Finish, ObjectKind.KillZone, ObjectKind.Pendulum, ObjectKind.Sign,
         };
 
-        /// <summary>Keys 1-0 pick the first ten; Shift+1 to Shift+4 the last four.</summary>
+        /// <summary>Keys 1-0 pick the first ten; Shift+1 to Shift+6 the rest.</summary>
         private static readonly KeyCode[] HotbarKeys =
         {
             KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
             KeyCode.Alpha7, KeyCode.Alpha8, KeyCode.Alpha9, KeyCode.Alpha0,
-            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4, KeyCode.Alpha5,
+            KeyCode.Alpha1, KeyCode.Alpha2, KeyCode.Alpha3, KeyCode.Alpha4, KeyCode.Alpha5, KeyCode.Alpha6,
         };
 
         private static bool HotbarNeedsShift(int i) => i >= 10;
 
-        private static readonly string[] HotbarKeyNames = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Shift 1", "Shift 2", "Shift 3", "Shift 4", "Shift 5" };
+        private static readonly string[] HotbarKeyNames = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "Shift 1", "Shift 2", "Shift 3", "Shift 4", "Shift 5", "Shift 6" };
 
         private static readonly Color[] Palette =
         {
@@ -546,6 +546,8 @@ namespace GTWLevelEditor
                 if (obj != null) SetPanelTab(PanelTab.Object); // picking something shows its settings
             }
             _selected = obj;
+            _group.Clear(); // a plain select picks just this one; SetSelection rebuilds a group after
+            if (obj != null) _group.Add(obj);
             _fieldText.Clear();
             _fieldTextOwner = obj;
         }
@@ -555,6 +557,7 @@ namespace GTWLevelEditor
             if (on == _cursorMode) return;
             _cursorMode = on;
             _drag = DragKind.None;
+            _pressPending = _boxing = false;
             GameBridge.SetCameraBrainEnabled(!on);
             if (_ghost != null) _ghost.gameObject.SetActive(!on);
             if (on)
@@ -909,9 +912,10 @@ namespace GTWLevelEditor
         private static string Fast => EditorKeys.Name(EditorAction.Fast);
 
         private static string MouseModeControls(string gap) =>
-            $"{K("Click")} select an object, then drag its handles{gap}{B(EditorAction.HandlesMove)} move (yellow square: along the ground){gap}{B(EditorAction.HandlesRotate)} rotate{gap}{B(EditorAction.HandlesScale)} scale" +
+            $"{K("Click")} select an object, then drag its handles{gap}{K("Drag")} box-select several{gap}{K("Shift+Click")} add / remove{gap}{BC(EditorAction.SelectAll)} all" +
+            $"\nWith several selected, the yellow-outlined one carries the handles; moving or rotating it takes the rest along{gap}{B(EditorAction.HandlesMove)} move (yellow square: along the ground){gap}{B(EditorAction.HandlesRotate)} rotate{gap}{B(EditorAction.HandlesScale)} scale" +
             $"\n{K("Drag")} a ramp's white points to reshape it ({K("Shift")} for up / down); a chosen point gets handles: {B(EditorAction.HandlesMove)} move, {B(EditorAction.HandlesRotate)} bank, {B(EditorAction.HandlesScale)} width. Click the ramp itself for whole-ramp handles" +
-            $"\n{B(EditorAction.DeleteSelected)} removes the chosen point or object" +
+            $"\n{B(EditorAction.DeleteSelected)} removes the chosen point, object or selection" +
             $"\n{K("Hold right mouse")} look around, with {B(EditorAction.CameraForward)}{B(EditorAction.CameraLeft)}{B(EditorAction.CameraBack)}{B(EditorAction.CameraRight)} to fly, {B(EditorAction.CameraDown)} / {B(EditorAction.CameraUp)} down / up{gap}{K("Wheel")} move forward / back{gap}{B(EditorAction.HidePlayer)} hide player" +
             $"\n{BC(EditorAction.Undo)} undo{gap}{BC(EditorAction.Redo)} redo{gap}{BC(EditorAction.Duplicate)} duplicate{gap}{BC(EditorAction.Copy)} / {BC(EditorAction.Paste)} copy / paste";
 
@@ -922,7 +926,7 @@ namespace GTWLevelEditor
             $"\n{B(EditorAction.FlyUp)} / {B(EditorAction.FlyDown)} fly up / down{gap}{K(Fast)} fast{gap}{B(EditorAction.Snap)} grid snap{gap}{K(Instance != null ? Instance.CursorModeKey.Value.ToString() : "Tab")} afterwards to fine-tune the points";
 
         private static string PlacingControls(string gap) =>
-            $"{K("1")}–{K("0")}, {K("Shift+1")}–{K("5")} or the bar at the top: choose an object{gap}{B(EditorAction.FlyUp)} / {B(EditorAction.FlyDown)} fly up / down{gap}{K(Fast)} fast" +
+            $"{K("1")}–{K("0")}, {K("Shift+1")}–{K("6")} or the bar at the top: choose an object{gap}{B(EditorAction.FlyUp)} / {B(EditorAction.FlyDown)} fly up / down{gap}{K(Fast)} fast" +
             $"\n{K("Left click")} place{gap}{K("Right click")} pick up{gap}{B(EditorAction.DeleteAimed)} delete{gap}{B(EditorAction.TurnLeft)} / {B(EditorAction.TurnRight)} turn{gap}{B(EditorAction.TiltBack)} / {B(EditorAction.TiltForward)} tilt{gap}{B(EditorAction.ResetTurn)} reset{gap}{B(EditorAction.Snap)} snap" +
             $"\n{K("Wheel")} size{gap}{K(Fast + "+Wheel")} height{gap}{K("Ctrl+Wheel")} pull closer / push away{gap}{B(EditorAction.LaunchSlower)} / {B(EditorAction.LaunchFaster)} launch speed{gap}{B(EditorAction.HidePlayer)} hide player" +
             $"\n{BC(EditorAction.Undo)} undo{gap}{BC(EditorAction.Redo)} redo{gap}{BC(EditorAction.Duplicate)} pick up a copy of the aimed object{gap}{BC(EditorAction.Copy)} / {BC(EditorAction.Paste)} copy / paste";
@@ -1086,6 +1090,7 @@ namespace GTWLevelEditor
                 GUILayout.Label("Nothing selected. Click an object in the world to select it.", Theme.Hint);
                 return;
             }
+            if (GroupActive) { DrawGroupPanel(); return; }
             var sel = _selected;
             string before = LevelJson.ObjectToJson(sel.Data);
             DrawSelected(sel);
@@ -1176,7 +1181,9 @@ namespace GTWLevelEditor
             {
                 d.spin = Mathf.Clamp(FloatField("Spin °/s", "spin", d.spin, 15f), -1080f, 1080f);
                 GUILayout.Label("Grab the cog to ride it; let go to fly off. Negative spin turns the other way.", Theme.Hint);
+                DrawCogCameraFields(obj);
             }
+            if (d.Kind == ObjectKind.Sign) DrawSignFields(d);
 
             if (d.IsSolidShape)
             {
@@ -1320,6 +1327,86 @@ namespace GTWLevelEditor
 
         /// <summary>A labelled number box with − / + buttons.</summary>
         /// <summary>A 0-100% slider in 5% steps.</summary>
+        /// <summary>The camera while riding a cog: automatic, or a point you place (it always looks at the cog's centre).</summary>
+        private void DrawCogCameraFields(LevelObject obj)
+        {
+            var d = obj.Data;
+            GUILayout.Space(2);
+            GUILayout.Label("Riding camera", Theme.Hint);
+            int mode = SegmentRow(d.cogCamera ? 1 : 0, new[] { "Automatic", "Custom point" });
+            if (mode == 1 && !d.cogCamera)
+            {
+                // Start from the view the automatic camera would pick right now.
+                var cam = Camera.main;
+                var world = obj.AutoCogCameraOffset(cam != null ? cam.transform.position : obj.transform.position - Vector3.forward);
+                d.cogCameraOffset = Quaternion.Inverse(obj.transform.rotation) * world;
+                d.cogCamera = true;
+            }
+            else if (mode == 0) d.cogCamera = false;
+            if (!d.cogCamera) return;
+
+            float dist = d.cogCameraOffset.magnitude;
+            if (dist < 0.1f) { d.cogCameraOffset = new Vector3(0f, 4f, -8f); dist = d.cogCameraOffset.magnitude; }
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Distance", GUILayout.Width(110));
+            float nd = GUILayout.HorizontalSlider(dist, 2f, 40f, GUILayout.ExpandWidth(true));
+            nd = Mathf.Round(nd * 4f) / 4f;
+            GUILayout.Label($"{nd:0.##} m", GUILayout.Width(64));
+            GUILayout.EndHorizontal();
+            if (Mathf.Abs(nd - dist) > 0.001f) d.cogCameraOffset = d.cogCameraOffset / dist * nd;
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Use my view"))
+            {
+                var cam = Camera.main;
+                if (cam != null)
+                {
+                    var world = cam.transform.position - obj.transform.position;
+                    if (world.magnitude < 2f) world = world.sqrMagnitude < 1e-4f ? -cam.transform.forward * 2f : world.normalized * 2f;
+                    if (world.magnitude > 40f) world = world.normalized * 40f;
+                    d.cogCameraOffset = Quaternion.Inverse(obj.transform.rotation) * world;
+                    Toast("Riding camera set from your view");
+                }
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.Label("Drag the camera marker (the blue dot joined to the cog) to move it, or \"Use my view\" to put it where you are. It always looks at the cog's centre and turns with the cog's rotation.", Theme.Hint);
+        }
+
+        private static readonly Color[] SignTextColours =
+        {
+            Color.white, new Color(0.1f, 0.1f, 0.1f), new Color(1f, 0.85f, 0.2f), new Color(1f, 0.35f, 0.25f),
+            new Color(0.35f, 0.65f, 1f), new Color(0.4f, 0.9f, 0.4f),
+        };
+
+        private void DrawSignFields(LevelObjectData d)
+        {
+            GUILayout.Space(2);
+            GUILayout.Label("Text", Theme.Hint);
+            d.text = GUILayout.TextArea(d.text ?? "", 500, GUILayout.MinHeight(60));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Text colour", GUILayout.Width(110));
+            var old = GUI.backgroundColor;
+            foreach (var c in SignTextColours)
+            {
+                GUI.backgroundColor = c;
+                if (GUILayout.Button(GUIContent.none, Theme.Swatch)) d.textColor = c;
+                if (SameColour(c, d.textColor))
+                {
+                    var r = GUILayoutUtility.GetLastRect();
+                    GUI.backgroundColor = Color.white;
+                    GUI.Box(new Rect(r.x - 3, r.y - 3, r.width + 6, r.height + 6), GUIContent.none, Theme.SwatchRing);
+                }
+            }
+            GUI.backgroundColor = old;
+            GUILayout.FlexibleSpace();
+            GUILayout.EndHorizontal();
+            d.textSize = Mathf.Max(0.1f, PercentSlider("Text size", d.textSize));
+            d.signBoard = GUILayout.Toggle(d.signBoard, "Show the board (off: the text floats, and you pass through it)");
+            d.signBothSides = GUILayout.Toggle(d.signBothSides, "Text on the back too");
+            d.signMono = GUILayout.Toggle(d.signMono, "Monospace (for ASCII art: equal-width letters, lines kept as typed)");
+            GUILayout.Label("The text fits itself to the board: stretch Size X / Y for more room. Turn the sign with Rotation Y (or the turn keys while placing).", Theme.Hint);
+        }
+
         private static float PercentSlider(string label, float value)
         {
             GUILayout.BeginHorizontal();

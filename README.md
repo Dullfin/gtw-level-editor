@@ -7,7 +7,7 @@ An in-game level editor for **Get To Work**, as a BepInEx 5 plugin. Build a cour
 - Moving platforms, pieces rotating around a shared pivot, and swinging pendulums.
 - Slippery (ice) and Sticky surfaces.
 - Start, checkpoints, finish with a timer and best time, kill zones and a kill height.
-- Move / rotate / scale handles, undo and redo, copy and paste.
+- Move / rotate / scale handles, box selection of several pieces, undo and redo, copy and paste.
 - Levels save as single JSON files that are easy to share.
 
 Custom levels run in an empty Doinkler world, and **the game's saves are switched off while one is running**. Your own progress, positions and times are never touched.
@@ -54,7 +54,7 @@ These are the default keys. To change them, open the panel's **Controls** tab an
 | Space / Left Alt | Fly up / down |
 | Left Shift | Fly faster |
 | 1 to 0 | Platform, Ramp, Wedge, Cylinder, Sphere, Jump pad, Bumper, Launcher, Wall launcher, Cog launcher |
-| Shift + 1 to 5 | Checkpoint, Start, Finish, Kill zone, Pendulum |
+| Shift + 1 to 6 | Checkpoint, Start, Finish, Kill zone, Pendulum, Sign |
 | Left mouse | Place the object |
 | Right mouse | Pick up the object you're aiming at, to move it |
 | Delete | Delete the object you're aiming at |
@@ -97,17 +97,22 @@ A selected ramp's panel has:
 | Key | Action |
 |---|---|
 | Left click | Select an object (click empty space to deselect) |
+| Left drag | Draw a box to select every piece whose centre is inside it (hold Shift to add to the selection) |
+| Shift+click | Add a piece to the selection, or take it out |
+| Ctrl+A | Select everything |
 | W / E / R | Move / rotate / scale handles |
 | Drag an arrow, ring or box | Move along an axis, rotate, or scale. The yellow square moves along the ground; the white centre box scales evenly |
 | Drag a ramp's white points | Reshape the ramp (hold Shift to move a point up or down) |
 | Click a ramp point | Put the handles on that point: W moves it along an axis or the ground, E's ring banks it, R's handle sets its width. Click the ramp itself to get the whole-ramp handles back |
-| Delete | Delete the chosen ramp point, or the selected object |
+| Delete | Delete the chosen ramp point, or the selected object or pieces |
 | Hold right mouse | Look around. While holding it, W / A / S / D fly the camera, Q / E (or Space) go down / up, and Shift goes faster |
 | Mouse wheel | Move the camera forward / back |
 | H | Hide or show your character |
 | Ctrl+Z / Ctrl+Y | Undo / redo (panel edits included) |
 | Ctrl+D | Duplicate the selection |
 | Ctrl+C / Ctrl+V | Copy / paste |
+
+**Selecting several pieces:** every selected piece gets an outline. The last one you picked has a yellow outline and carries the handles: moving it moves the whole selection, and rotating it turns the rest around it. Scaling and the panel's settings work on one piece at a time, so the panel shows **Copy**, **Duplicate** and **Delete** for the group instead. Ctrl+C copies the whole selection. Ctrl+V pastes it beside the originals in mouse mode, or on the surface under the crosshair while flying, so you can reuse a section anywhere, even in another level. A level only has one Start, so a copied Start isn't pasted.
 
 The panel has four tabs:
 - **Object:** the selected object's position, rotation, size, colour, surface, launch speed and motion. Selecting an object switches to this tab.
@@ -133,7 +138,9 @@ Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift 
 - **Launcher:** the game's slingshot. Roll onto the orange carriage and hold Grab. It locks you on, shoots along its arrow and throws you at its launch speed. Tilt it with Rotation X. The panel sets the travel and launch speed, and a yellow line previews the path while editing.
 - **Wall launcher:** the same slingshot mounted on a wall.
 - **Cog launcher:** the game's giant spinning cog. Grab it to ride it, and let go to fly off with its speed. Negative spin turns it the other way.
+  - While you ride it, the camera holds still behind and above the cog, as it does on the game's cogs. By default it picks that view itself. Set **Riding camera** to **Custom point** to choose it: drag the blue camera marker, or press **Use my view** to put the camera where you are. A distance slider moves it closer or further away. It always looks at the cog's centre and turns with the cog's rotation.
 - **Pendulum:** the swinging pendulum from Doinkler 4-5. It hangs from the point you place it. The bob is sticky, so you can ride it.
+- **Sign:** a board with text on it, for directions, warnings or a message at the finish. Type the text in the panel (new lines are kept) and pick its colour. The text fits itself to the board, so stretch Size X / Y to give it more room; **Text size** keeps it smaller than that. Untick **Show the board** for floating text you pass straight through, and tick **Text on the back too** for a sign readable from both sides. Tick **Monospace** for ASCII art: every character is the same width and lines stay as typed, so pictures keep their shape; two signs of the same size holding art of the same width line up when stacked. It uses the game's own UI font. Turn it with Rotation Y, or the turn keys while placing.
 - **Jump pad:** launches you along its up direction.
 - **Bumper:** pushes you away from its centre. Jump pads and bumpers use the same maths as the game's own.
 - **Start / Checkpoint / Finish:** where you spawn, where you respawn, and where the timer stops. They're only visible while editing. In play mode they're invisible and you pass straight through them, so place them on the ground the player rolls over.

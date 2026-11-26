@@ -20,7 +20,7 @@ namespace GTWLevelEditor
         HandlesMove, HandlesRotate, HandlesScale, DeleteSelected,
         CameraForward, CameraBack, CameraLeft, CameraRight, CameraDown, CameraUp,
         // with Ctrl held
-        Undo, Redo, Copy, Paste, Duplicate,
+        Undo, Redo, Copy, Paste, Duplicate, SelectAll,
     }
 
     /// <summary>
@@ -100,6 +100,7 @@ namespace GTWLevelEditor
             Add(EditorAction.Copy, WithCtrl, "Copy", KeyCode.C);
             Add(EditorAction.Paste, WithCtrl, "Paste", KeyCode.V);
             Add(EditorAction.Duplicate, WithCtrl, "Duplicate", KeyCode.D);
+            Add(EditorAction.SelectAll, WithCtrl, "Select everything (mouse mode)", KeyCode.A);
         }
 
         /// <summary>Binds every action to the config; missing or unreadable entries use the defaults.</summary>
