@@ -60,10 +60,10 @@ namespace GTWLevelEditor
             }
         }
 
-        /// <summary>Moves a file to the Recycle Bin, so a deleted level can still be restored.</summary>
+        /// <summary>Moves a file or folder to the Recycle Bin, so a deleted level or prefab can still be restored.</summary>
         public static bool Recycle(string path)
         {
-            if (!File.Exists(path)) return false;
+            if (!File.Exists(path) && !Directory.Exists(path)) return false;
             var op = new ShFileOpStruct
             {
                 hwnd = IntPtr.Zero,
@@ -71,7 +71,7 @@ namespace GTWLevelEditor
                 pFrom = Path.GetFullPath(path) + "\0\0",
                 fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI,
             };
-            return SHFileOperation(ref op) == 0 && !op.fAnyOperationsAborted && !File.Exists(path);
+            return SHFileOperation(ref op) == 0 && !op.fAnyOperationsAborted && !File.Exists(path) && !Directory.Exists(path);
         }
 
         private const int OFN_OVERWRITEPROMPT = 0x2;

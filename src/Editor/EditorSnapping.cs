@@ -110,10 +110,11 @@ namespace GTWLevelEditor
             LevelObject piece = null;
             if (_cursorMode) piece = _selected;
             else if (!_rampTool && _ghost != null && _ghost.gameObject.activeSelf) piece = _ghost;
+            BeginLineBatch(); // the grid and outlines are hundreds of lines: one draw call instead
             if (piece != null && !piece.IsRamp) DrawGrid(cam, ui, piece.GetBounds());
 
             // Outlines last only while the snap that found them is current (this frame or the last).
-            if (Time.frameCount - _snapTargetsFrame > 1) return;
+            if (Time.frameCount - _snapTargetsFrame > 1) { EndLineBatch(); return; }
             var color = new Color(0.3f, 0.95f, 1f, 0.9f);
             foreach (var b in _snapTargets)
             {
@@ -129,6 +130,7 @@ namespace GTWLevelEditor
                     if (av && cv) Line(a, c, color, 2.5f * ui);
                 }
             }
+            EndLineBatch();
         }
 
         /// <summary>A faint grid on the level of the piece's base, fading out around it.</summary>

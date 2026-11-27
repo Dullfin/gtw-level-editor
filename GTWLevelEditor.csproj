@@ -5,7 +5,7 @@
     <AssemblyName>GTWLevelEditor</AssemblyName>
     <RootNamespace>GTWLevelEditor</RootNamespace>
     <Product>GTW Level Editor</Product>
-    <Version>0.9.0</Version>
+    <Version>0.10.0</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>

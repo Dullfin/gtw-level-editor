@@ -118,10 +118,18 @@ namespace GTWLevelEditor
 
         private void Update()
         {
+            _timingClock.Restart();
+            try { UpdateEditor(); }
+            finally { AddTiming(ref _updateMs); }
+        }
+
+        private void UpdateEditor()
+        {
             ReadMouse();
             RunPendingFileAction();
             UpdatePlayerVisibility();
             if (CustomSession.Active && _sessionReady) UpdateTubeCuts();
+            if (CustomSession.Active && _sessionReady && IsEditing) UpdatePrefabThumbnails();
             _onTitle = CustomSession.IsOnTitleScreen();
             if (_onTitle) EnsureTitleButton();
             if (CustomSession.Active && !_sessionReady && _onTitle && Time.unscaledTime - _beginTime > 20f)
@@ -411,6 +419,7 @@ namespace GTWLevelEditor
         /// <summary>Puts the ghost where the crosshair points: resting on the surface it hits, or floating in front.</summary>
         private void PositionGhost()
         {
+            _ghostClock.Restart();
             var ghost = _ghost;
             ghost.Data.rotation = _ghostEuler;
             ghost.Data.position = Vector3.zero;
@@ -437,6 +446,7 @@ namespace GTWLevelEditor
             pos = SnapPosition(ghost, BoundsAt(ghost, pos), pos, along != 0, along != 1, along != 2);
             ghost.Data.position = pos;
             ghost.Refresh();
+            _ghostMs += _ghostClock.Elapsed.TotalMilliseconds;
         }
 
 
@@ -495,10 +505,13 @@ namespace GTWLevelEditor
 
         private void PlaceGhost()
         {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
             PushUndo();
+            double undoMs = clock.Elapsed.TotalMilliseconds;
             var placed = _ghost;
             _ghost = null;
             placed.SetGhost(false);
+            double solidMs = clock.Elapsed.TotalMilliseconds - undoMs;
             if (placed.Kind == ObjectKind.Start)
             {
                 foreach (var other in _objects.Where(o => o.Kind == ObjectKind.Start).ToList()) DeleteObject(other, undo: false);
@@ -513,7 +526,9 @@ namespace GTWLevelEditor
                 return;
             }
             // Next ghost copies the last one so runs of identical platforms are quick to build.
+            double before = clock.Elapsed.TotalMilliseconds;
             SpawnGhost(placed.Data.Clone());
+            NotePlaceTiming(clock.Elapsed.TotalMilliseconds, undoMs, solidMs, clock.Elapsed.TotalMilliseconds - before);
         }
 
         private void PickUp(LevelObject obj)
@@ -565,6 +580,7 @@ namespace GTWLevelEditor
                 _frozenPlayerPos = GameBridge.Player.PlayerTransform.position;
                 RememberMouseModeCamera();
                 RefreshLevelList();
+                RefreshPrefabList();
             }
             else
             {
@@ -711,7 +727,7 @@ namespace GTWLevelEditor
                 ClearUndo();
                 _bestTime = PersonalBests.Get(_level.name);
                 string note = data.environment != CustomSession.Environment
-                    ? $" (made in World {data.environment + 1}, opened in World {CustomSession.Environment + 1})" : "";
+                    ? $" (made in {CustomSession.WorldName(data.environment)}, opened in {CustomSession.WorldName(CustomSession.Environment)})" : "";
                 Toast($"Loaded {name}: {_objects.Count} objects{note}", 4f);
                 if (IsEditing) MovePlayerToStart();
                 else StartPlay();
@@ -779,6 +795,14 @@ namespace GTWLevelEditor
         }
 
         private void OnGUI()
+        {
+            _timingClock.Restart();
+            try { DrawGui(); }
+            finally { AddTiming(ref _guiMs); }
+            if (Event.current.type == EventType.Repaint) DrawTimingReadout();
+        }
+
+        private void DrawGui()
         {
             if (IsEditing && CustomSession.Active && _sessionReady && Event.current.type == EventType.Repaint && (!DemoRunning || _demoOverlays))
             {
@@ -1074,7 +1098,7 @@ namespace GTWLevelEditor
             {
                 case PanelTab.Object: DrawObjectTab(); break;
                 case PanelTab.Level: DrawLevelTab(); break;
-                case PanelTab.Saved: DrawSavedTab(); break;
+                case PanelTab.Prefabs: DrawPrefabsTab(); break;
                 case PanelTab.Controls: DrawControlsTab(); break;
             }
             EndPanelScroll();
@@ -1090,16 +1114,61 @@ namespace GTWLevelEditor
                 GUILayout.Label("Nothing selected. Click an object in the world to select it.", Theme.Hint);
                 return;
             }
+            if (!_cursorMode) { DrawFlySummary(); return; }
             if (GroupActive) { DrawGroupPanel(); return; }
             var sel = _selected;
-            string before = LevelJson.ObjectToJson(sel.Data);
+            // Layout and repaint passes never change values, and they run every frame: only input passes
+            // (clicks, drags, typing) are checked for edits, which costs two JSON copies of the piece.
+            var pass = Event.current.type;
+            bool input = pass != EventType.Layout && pass != EventType.Repaint;
+            string before = input ? LevelJson.ObjectToJson(sel.Data) : null;
             DrawSelected(sel);
-            if (_objects.Contains(sel) && LevelJson.ObjectToJson(sel.Data) != before) NotePanelEdit(sel, before);
+            if (input && _objects.Contains(sel) && LevelJson.ObjectToJson(sel.Data) != before) NotePanelEdit(sel, before);
+            if (_objects.Contains(sel) && sel.Kind != ObjectKind.Start && GUILayout.Button("Save as prefab…", Theme.GhostButton)) StartSavePrefab();
+        }
+
+        private int _flySummaryFrame = -1;
+        private string _flySummaryTitle, _flySummaryText;
+
+        /// <summary>
+        /// Fly mode (the docked panel can't be used without the mouse): a short read-only summary of the
+        /// selection instead of all its controls, which are costly to lay out every frame. Rebuilt once a frame.
+        /// </summary>
+        private void DrawFlySummary()
+        {
+            if (_flySummaryFrame != Time.frameCount)
+            {
+                _flySummaryFrame = Time.frameCount;
+                var pieces = SelectionList();
+                if (GroupActive)
+                {
+                    _flySummaryTitle = $"Selected  ·  {pieces.Count} pieces";
+                    _flySummaryText = string.Join(", ", pieces.GroupBy(o => o.Kind).Select(g => $"{g.Count()} × {KindName(g.Key)}"));
+                }
+                else
+                {
+                    var d = _selected.Data;
+                    _flySummaryTitle = "Selected  ·  " + KindName(d.Kind);
+                    string size = d.Kind == ObjectKind.Ramp ? $"{d.points.Count} points"
+                                : d.Kind == ObjectKind.Pendulum ? $"length {d.length:0.##} m"
+                                : $"size {d.scale.x:0.##} × {d.scale.y:0.##} × {d.scale.z:0.##}";
+                    _flySummaryText = $"Position {d.position.x:0.##}, {d.position.y:0.##}, {d.position.z:0.##}\n"
+                                    + $"Rotation {d.rotation.x:0.#}°, {d.rotation.y:0.#}°, {d.rotation.z:0.#}°\n"
+                                    + char.ToUpperInvariant(size[0]) + size.Substring(1)
+                                    + (d.IsSolidShape && d.Surface != SurfaceType.Normal ? $"\nSurface: {d.Surface}" : "")
+                                    + (d.HasMotion ? $"\nMotion: {d.Motion}" : "");
+                }
+            }
+            Theme.Section(_flySummaryTitle);
+            GUILayout.BeginVertical(Theme.Card);
+            GUILayout.Label(_flySummaryText);
+            GUILayout.Label($"Press {CursorModeKey.Value} for mouse mode to change its settings.", Theme.Hint);
+            GUILayout.EndVertical();
         }
 
         private void DrawLevelTab()
         {
-            Theme.Section($"Level  ·  World {CustomSession.Environment + 1}");
+            Theme.Section($"Level  ·  {CustomSession.WorldName(CustomSession.Environment)}");
             GUILayout.BeginVertical(Theme.Card);
             GUILayout.BeginHorizontal();
             GUILayout.Label("Name", GUILayout.Width(70));
@@ -1121,9 +1190,10 @@ namespace GTWLevelEditor
                 }
             }
             GUILayout.EndVertical();
+            DrawSavedLevels();
         }
 
-        private void DrawSavedTab()
+        private void DrawSavedLevels()
         {
             Theme.Section("Saved levels");
             if (_levelFiles.Length == 0) GUILayout.Label("None yet.", Theme.Hint);

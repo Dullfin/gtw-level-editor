@@ -184,21 +184,53 @@ namespace GTWLevelEditor
         /// <summary>Let the track twist freely with the curve (needed for loops) instead of keeping its "up" pointing at the sky.</summary>
         public bool followTwist;
 
+        // The enums are saved as names; parsing a name is slow and these are read hundreds of times a frame
+        // (overlays, the panel, snapping), so each keeps the last name it parsed and its value.
+        // Private fields: JsonUtility doesn't save them.
+        private string _kindName, _surfaceName, _motionName;
+        private ObjectKind _kindValue;
+        private SurfaceType _surfaceValue;
+        private MotionType _motionValue;
+
         public ObjectKind Kind
         {
-            get => Enum.TryParse(kind, out ObjectKind k) ? k : ObjectKind.Platform;
+            get
+            {
+                if (!ReferenceEquals(kind, _kindName))
+                {
+                    _kindValue = Enum.TryParse(kind, out ObjectKind k) ? k : ObjectKind.Platform;
+                    _kindName = kind;
+                }
+                return _kindValue;
+            }
             set => kind = value.ToString();
         }
 
         public SurfaceType Surface
         {
-            get => Enum.TryParse(surface, out SurfaceType s) ? s : SurfaceType.Normal;
+            get
+            {
+                if (!ReferenceEquals(surface, _surfaceName))
+                {
+                    _surfaceValue = Enum.TryParse(surface, out SurfaceType s) ? s : SurfaceType.Normal;
+                    _surfaceName = surface;
+                }
+                return _surfaceValue;
+            }
             set => surface = value.ToString();
         }
 
         public MotionType Motion
         {
-            get => Enum.TryParse(motion, out MotionType m) ? m : MotionType.None;
+            get
+            {
+                if (!ReferenceEquals(motion, _motionName))
+                {
+                    _motionValue = Enum.TryParse(motion, out MotionType m) ? m : MotionType.None;
+                    _motionName = motion;
+                }
+                return _motionValue;
+            }
             set => motion = value.ToString();
         }
 

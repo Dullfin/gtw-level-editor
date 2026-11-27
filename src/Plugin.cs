@@ -13,7 +13,7 @@ namespace GTWLevelEditor
     public class Plugin : BaseUnityPlugin
     {
         public const string Guid = "com.Dullfin.GTWLevelEditor";
-        public const string Version = "0.9.0";
+        public const string Version = "0.10.0";
 
         internal static ManualLogSource Log;
         private Harmony _harmony;
@@ -40,6 +40,8 @@ namespace GTWLevelEditor
                 "Screen position of the help window. Drag it while the panel is open to change this.");
             editor.HelpCompact = Config.Bind("Editor", "HelpWindowCompact", false,
                 "Show only the status line in the help window.");
+            editor.ShowTiming = Config.Bind("Editor", "ShowEditorTiming", false,
+                "Show how long the editor takes each frame, top-left of the screen (also in the panel's Controls tab).");
             editor.HidePlayerInEditor = Config.Bind("Editor", "HidePlayerInEditor", false,
                 "Hide your character while editing so it doesn't block the view (toggle in game with H).");
             editor.ShowHelpWindow = Config.Bind("Editor", "ShowControlsWindow", true,
@@ -55,6 +57,7 @@ namespace GTWLevelEditor
             editor.UiScale = Config.Bind("Editor", "UiScale", 1f,
                 "Size of the editor UI. 1 = sized for the screen height (the same proportion at 1080p and 4K); 1.25 = 25% bigger.");
             editor.LevelsDirectory = Path.Combine(Paths.BepInExRootPath, "LevelEditor", "Levels");
+            editor.PrefabsDirectory = Path.Combine(Paths.BepInExRootPath, "LevelEditor", "Prefabs");
 
             var debug = Config.Bind("Debug", "EnableDebugCommands", false,
                 @"Development aid: run commands written to BepInEx\LevelEditor\Debug\commands.txt (screenshots, scene dumps, starting levels).");

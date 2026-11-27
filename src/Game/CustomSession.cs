@@ -50,13 +50,20 @@ namespace GTWLevelEditor
         private static UIDoinklerPortfolio FindPortfolio() =>
             UnityEngine.Object.FindFirstObjectByType<UIDoinklerPortfolio>(FindObjectsInactive.Include);
 
+        /// <summary>The Doinkler worlds' names, after their settings (skybox and scenery), in the game's order.</summary>
+        private static readonly string[] WorldNames = { "Farm", "Hotel", "Stairwell", "City Sky", "Sky", "Space" };
+
+        /// <summary>A world's name, or "World N" for any world past the named ones.</summary>
+        public static string WorldName(int env) =>
+            env >= 0 && env < WorldNames.Length ? WorldNames[env] : "World " + (env + 1);
+
         /// <summary>Names of the worlds the custom level can be built in (Doinkler worlds 1-6).</summary>
         public static List<string> EnvironmentNames()
         {
             var names = new List<string>();
             var worlds = Worlds(FindPortfolio());
             if (worlds == null) return names;
-            for (int i = 0; i < worlds.Count; i++) names.Add("World " + (i + 1));
+            for (int i = 0; i < worlds.Count; i++) names.Add(WorldName(i));
             return names;
         }
 
@@ -76,7 +83,7 @@ namespace GTWLevelEditor
 
             int env = Mathf.Clamp(level.environment, 0, worlds.Count - 1);
             var world = worlds[env];
-            if (world.GameLevels == null || world.GameLevels.Count == 0) return $"World {env + 1} has no levels.";
+            if (world.GameLevels == null || world.GameLevels.Count == 0) return $"The {WorldName(env)} world has no levels.";
 
             Level = level;
             Level.environment = env;
@@ -95,7 +102,7 @@ namespace GTWLevelEditor
                 Plugin.Log.LogError("Starting the custom level failed: " + e);
                 return "Starting the level failed; see BepInEx\\LogOutput.log.";
             }
-            Plugin.Log.LogInfo($"Starting custom level '{level.name}' in world {env + 1} ({(startInEditor ? "edit" : "play")}).");
+            Plugin.Log.LogInfo($"Starting custom level '{level.name}' in world {env + 1}, {WorldName(env)} ({(startInEditor ? "edit" : "play")}).");
             return null;
         }
 

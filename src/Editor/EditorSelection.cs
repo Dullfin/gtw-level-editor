@@ -282,6 +282,7 @@ namespace GTWLevelEditor
             if (GUILayout.Button("Duplicate")) DuplicateSelection();
             if (GUILayout.Button("Delete", Theme.DangerButton)) DeleteSelection();
             GUILayout.EndHorizontal();
+            if (GUILayout.Button("Save as prefab…", Theme.AccentButton)) StartSavePrefab();
             if (GUILayout.Button("Select only " + KindName(_selected.Kind), Theme.GhostButton)) Select(_selected);
         }
 

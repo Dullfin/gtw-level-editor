@@ -4,15 +4,15 @@ using UnityEngine;
 namespace GTWLevelEditor
 {
     /// <summary>
-    /// The panel's tabs: the selected object, the level's settings, saved levels, and the controls
+    /// The panel's tabs: the selected object, the level's settings and saved levels, prefabs, and the controls
     /// (with the editor's display options, including reopening the Controls window).
     /// </summary>
     public partial class LevelEditorController
     {
         public ConfigEntry<bool> ShowHelpWindow;
 
-        private enum PanelTab { Object, Level, Saved, Controls }
-        private static readonly string[] PanelTabNames = { "Object", "Level", "Saved", "Controls" };
+        private enum PanelTab { Object, Level, Prefabs, Controls }
+        private static readonly string[] PanelTabNames = { "Object", "Level", "Prefabs", "Controls" };
         private PanelTab _panelTab = PanelTab.Object;
 
         /// <summary>Whether the floating Controls window shows while editing (remembered in the config).</summary>
@@ -55,6 +55,11 @@ namespace GTWLevelEditor
             }
             bool hide = GUILayout.Toggle(HidePlayerInEditor.Value, "Hide my character while editing (H)");
             if (hide != HidePlayerInEditor.Value) HidePlayerInEditor.Value = hide;
+            if (ShowTiming != null)
+            {
+                bool timing = GUILayout.Toggle(ShowTiming.Value, "Show editor timing (frame rate and the editor's share of each frame)");
+                if (timing != ShowTiming.Value) ShowTiming.Value = timing;
+            }
             GUILayout.EndVertical();
 
             Theme.Section("Snapping");

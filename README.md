@@ -8,6 +8,7 @@ An in-game level editor for **Get To Work**, as a BepInEx 5 plugin. Build a cour
 - Slippery (ice) and Sticky surfaces.
 - Start, checkpoints, finish with a timer and best time, kill zones and a kill height.
 - Move / rotate / scale handles, box selection of several pieces, undo and redo, copy and paste.
+- Prefabs: save a set of pieces once and place it in any level.
 - Levels save as single JSON files that are easy to share.
 
 Custom levels run in an empty Doinkler world, and **the game's saves are switched off while one is running**. Your own progress, positions and times are never touched.
@@ -29,7 +30,7 @@ You need Get To Work with [BepInEx 5](https://github.com/BepInEx/BepInEx) instal
 ## Getting started
 
 1. On the title screen, click **Level Editor** (below The Doinkler Portfolio and The Doinkler Special).
-2. Pick a world for the sky and lighting, then click **New level**, or **Play** / **Edit** a saved level.
+2. Pick a world for the sky and lighting (Farm, Hotel, Stairwell, City Sky, Sky or Space), then click **New level**, or **Play** / **Edit** a saved level.
 3. You start in the editor, flying. Place objects at the crosshair.
 4. Press **F8** to play: you spawn on the Start pad and the timer starts. Press **F8** again to go back to editing.
 5. Leave from the pause menu by quitting to the title screen.
@@ -114,11 +115,13 @@ A selected ramp's panel has:
 
 **Selecting several pieces:** every selected piece gets an outline. The last one you picked has a yellow outline and carries the handles: moving it moves the whole selection, and rotating it turns the rest around it. Scaling and the panel's settings work on one piece at a time, so the panel shows **Copy**, **Duplicate** and **Delete** for the group instead. Ctrl+C copies the whole selection. Ctrl+V pastes it beside the originals in mouse mode, or on the surface under the crosshair while flying, so you can reuse a section anywhere, even in another level. A level only has one Start, so a copied Start isn't pasted.
 
+**Prefabs:** to reuse a piece or a whole section in other levels, select it (drag a box around several pieces) and press **Save as prefab…** in the panel, or open the **Prefabs** tab. Name it and press **Save prefab**. The Prefabs tab shows your prefabs as a grid of pictures, drawn from each prefab when you open the tab. In any level or world, click a picture to place a copy on the surface in the middle of your view. The copy is selected, so you can drag or turn it into place, and Ctrl+Z removes it. **New folder** makes a folder in the one you have open. Click a folder to open it, and use the path above the grid to go back. New prefabs are saved into the open folder. Each tile's **...** button renames it, moves a prefab to another folder, or deletes it. Deleting moves the file or folder to the Recycle Bin. Prefabs are saved in `Get To Work\BepInEx\LevelEditor\Prefabs\`, one JSON file each, with folders as ordinary folders, so you can share them like levels. The Start isn't saved in prefabs, since a level has only one.
+
 The panel has four tabs:
 - **Object:** the selected object's position, rotation, size, colour, surface, launch speed and motion. Selecting an object switches to this tab.
-- **Level:** the level's name, Save, New, and the kill height.
-- **Saved:** your saved levels, to load.
-- **Controls:** every control, plus display options: show or hide the Controls window, the docked layout, and hiding your character.
+- **Level:** the level's name, Save, New, the kill height, and your saved levels to load.
+- **Prefabs:** save the selection as a prefab, and place, organise into folders, rename or delete your prefabs.
+- **Controls:** every control, plus display options: show or hide the Controls window, the docked layout, hiding your character, and an editor timing readout (frame rate and how much of each frame the editor takes).
 
 Drag the X / Y / Z letters left or right to change a value smoothly (hold Shift for fine changes), or type an exact number.
 

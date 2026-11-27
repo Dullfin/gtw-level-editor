@@ -979,11 +979,81 @@ namespace GTWLevelEditor
             }
         }
 
+        // ---------------- batched lines ----------------
+        // Each IMGUI line is its own draw call. Overlays with hundreds of lines (the snap grid) collect them
+        // between BeginLineBatch and EndLineBatch instead and draw them all in one GL pass.
+
+        private static Material _lineMaterial;
+        private static bool _lineMaterialTried;
+        private static bool _batchingLines;
+        private static readonly List<Vector3> _batchCorners = new List<Vector3>();
+        private static readonly List<Color> _batchColours = new List<Color>();
+
+        private static Material LineMaterial
+        {
+            get
+            {
+                if (_lineMaterialTried) return _lineMaterial;
+                _lineMaterialTried = true;
+                var shader = Shader.Find("Hidden/Internal-Colored");
+                if (shader == null)
+                {
+                    Plugin.Log.LogWarning("Hidden/Internal-Colored not found: overlay lines are drawn one at a time.");
+                    return null;
+                }
+                _lineMaterial = new Material(shader) { hideFlags = HideFlags.HideAndDontSave };
+                _lineMaterial.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+                _lineMaterial.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+                _lineMaterial.SetInt("_Cull", (int)UnityEngine.Rendering.CullMode.Off);
+                _lineMaterial.SetInt("_ZWrite", 0);
+                _lineMaterial.SetInt("_ZTest", (int)UnityEngine.Rendering.CompareFunction.Always);
+                return _lineMaterial;
+            }
+        }
+
+        private static void BeginLineBatch()
+        {
+            _batchCorners.Clear();
+            _batchColours.Clear();
+            _batchingLines = Event.current != null && Event.current.type == EventType.Repaint && LineMaterial != null;
+        }
+
+        private static void EndLineBatch()
+        {
+            if (!_batchingLines) return;
+            _batchingLines = false;
+            if (_batchColours.Count == 0) return;
+            LineMaterial.SetPass(0);
+            GL.PushMatrix();
+            GL.LoadPixelMatrix(0f, Screen.width, Screen.height, 0f); // GUI coordinates: y down from the top
+            GL.Begin(GL.QUADS);
+            for (int i = 0; i < _batchColours.Count; i++)
+            {
+                GL.Color(_batchColours[i]);
+                for (int k = 0; k < 4; k++) GL.Vertex(_batchCorners[i * 4 + k]);
+            }
+            GL.End();
+            GL.PopMatrix();
+            _batchCorners.Clear();
+            _batchColours.Clear();
+        }
+
         private static void Line(Vector2 a, Vector2 b, Color color, float width)
         {
             var d = b - a;
             float length = d.magnitude;
             if (length < 0.5f) return;
+            if (_batchingLines)
+            {
+                var side = new Vector2(-d.y, d.x) / length * (width * 0.5f);
+                var m = GUI.matrix;
+                _batchCorners.Add(m.MultiplyPoint3x4(a + side));
+                _batchCorners.Add(m.MultiplyPoint3x4(b + side));
+                _batchCorners.Add(m.MultiplyPoint3x4(b - side));
+                _batchCorners.Add(m.MultiplyPoint3x4(a - side));
+                _batchColours.Add(color);
+                return;
+            }
             var matrix = GUI.matrix;
             var old = GUI.color;
             GUIUtility.RotateAroundPivot(Mathf.Atan2(d.y, d.x) * Mathf.Rad2Deg, a);

@@ -44,6 +44,17 @@ namespace GTWLevelEditor
             }
             if (sig == _cutSignature) return;
             _cutSignature = sig;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            try { RebuildTubeCuts(); }
+            finally
+            {
+                if (ShowTiming != null && ShowTiming.Value)
+                    Plugin.Log.LogInfo($"Tube cuts rechecked in {clock.Elapsed.TotalMilliseconds:0.00} ms ({_objects.Count} pieces).");
+            }
+        }
+
+        private void RebuildTubeCuts()
+        {
 
             var tubes = new List<LevelObjectData>();
             foreach (var o in _objects) if (o != null && o.Data.IsHollow && o.Data.cutsPlatforms) tubes.Add(o.Data);
